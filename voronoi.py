@@ -1,4 +1,5 @@
 import numpy as np
+import cv2
 from matplotlib.path import Path
 from scipy.spatial import Voronoi
 import heapq
@@ -7,6 +8,37 @@ import heapq
 # Configurações
 # ----------------------------------------------------------------------
 PASSO_AMOSTRA = 10        # distância (px) entre sites ao longo do contorno
+
+
+def dilatar_obstaculos(obstaculos, raio_px, dimensoes):
+    if raio_px < 0:
+        raise ValueError("O raio de dilatação não pode ser negativo.")
+    if not obstaculos or raio_px == 0:
+        return [np.asarray(poligono, dtype=float) for poligono in obstaculos]
+
+    largura, altura = dimensoes
+    mascara = np.zeros((altura, largura), dtype=np.uint8)
+    contornos = [
+        np.round(poligono).astype(np.int32).reshape(-1, 1, 2)
+        for poligono in obstaculos
+    ]
+    cv2.fillPoly(mascara, contornos, 255)
+
+    raio_kernel = int(np.ceil(raio_px))
+    tamanho_kernel = 2 * (raio_kernel + 1) + 1
+    kernel = cv2.getStructuringElement(
+        cv2.MORPH_ELLIPSE, (tamanho_kernel, tamanho_kernel)
+    )
+    mascara = cv2.dilate(mascara, kernel)
+
+    contornos_dilatados, _ = cv2.findContours(
+        mascara, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
+    )
+    return [
+        cv2.approxPolyDP(contorno, 1.0, True).reshape(-1, 2).astype(float)
+        for contorno in contornos_dilatados
+        if len(contorno) >= 3
+    ]
 
 
 
