@@ -48,7 +48,7 @@ def main():
         frames += 1
 
         objetos, mascara = detectarFormas(frame)
-        print(objetos)
+        
         obstaculos = [
             obj.poligono.reshape(-1, 2).astype(float)
             for obj in objetos
