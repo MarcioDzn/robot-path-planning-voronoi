@@ -40,7 +40,7 @@ def main():
     while True:
         check, frame = video.read()
 
-        frame = cv2.imread("image_borda.png")
+        frame = cv2.imread("novo/mesa.png")
 
         if not check:
             break
