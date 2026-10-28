@@ -59,7 +59,72 @@ def classificarForma(cnt, approx):
         return f"Poligono ({vertices})", (128, 128, 128)
 
 
-def detectarFormas(frame):
+def detectarMarcadoresVermelhos(frame):
+    hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+    vermelho_baixo = cv2.inRange(
+        hsv, np.array([0, 80, 50]), np.array([10, 255, 255])
+    )
+    vermelho_alto = cv2.inRange(
+        hsv, np.array([170, 80, 50]), np.array([180, 255, 255])
+    )
+    mascara_vermelha = cv2.bitwise_or(vermelho_baixo, vermelho_alto)
+
+    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    blur = cv2.GaussianBlur(gray, (5, 5), 0)
+    _, mascara_arena = cv2.threshold(
+        blur, LIMITE_PRETO, 255, cv2.THRESH_BINARY
+    )
+    mascara_arena = cv2.morphologyEx(
+        mascara_arena, cv2.MORPH_CLOSE, np.ones((5, 5), np.uint8)
+    )
+    contornos_arena, _ = cv2.findContours(
+        mascara_arena, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
+    )
+    if not contornos_arena:
+        return [], mascara_vermelha
+
+    contorno_arena = max(contornos_arena, key=cv2.contourArea)
+    contornos_vermelhos, _ = cv2.findContours(
+        mascara_vermelha, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
+    )
+
+    centros = []
+    mascara_marcadores = np.zeros_like(mascara_vermelha)
+    for contorno in contornos_vermelhos:
+        area = cv2.contourArea(contorno)
+        if area < MIN_AREA:
+            continue
+
+        x, y, largura, altura = cv2.boundingRect(contorno)
+        proporcao = largura / altura if altura else 0
+        perimetro = cv2.arcLength(contorno, True)
+        circularidade = (
+            4 * np.pi * area / perimetro**2 if perimetro > 0 else 0
+        )
+        momentos = cv2.moments(contorno)
+        if momentos["m00"] == 0:
+            continue
+
+        centro = (
+            momentos["m10"] / momentos["m00"],
+            momentos["m01"] / momentos["m00"],
+        )
+        dentro_da_arena = cv2.pointPolygonTest(
+            contorno_arena, centro, False
+        ) >= 0
+        formato_compacto = (
+            0.65 <= proporcao <= 1.55 and circularidade >= 0.55
+        )
+        if dentro_da_arena and formato_compacto:
+            centros.append(tuple(map(int, np.round(centro))))
+            cv2.drawContours(
+                mascara_marcadores, [contorno], -1, 255, cv2.FILLED
+            )
+
+    return centros, mascara_marcadores
+
+
+def detectarFormas(frame, mascara_exclusao=None):
     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
     blur = cv2.GaussianBlur(gray, (5, 5), 0)
 
@@ -133,6 +198,10 @@ def detectarFormas(frame):
     mascara_obstaculos = cv2.morphologyEx(
         mascara_obstaculos, cv2.MORPH_CLOSE, kernel_ruido
     )
+    if mascara_exclusao is not None:
+        mascara_obstaculos = cv2.bitwise_and(
+            mascara_obstaculos, cv2.bitwise_not(mascara_exclusao)
+        )
 
     # --------------------------------------------------
     # 3. Extrai e classifica os obstáculos

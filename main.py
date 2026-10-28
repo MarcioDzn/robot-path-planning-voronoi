@@ -2,7 +2,7 @@ import cv2
 import numpy as np
 from aux_class import Objeto
 from calibracao import Calibracao, calibrar_xadrez, desenhar_referencial
-from proc_img import detectarFormas
+from proc_img import detectarFormas, detectarMarcadoresVermelhos
 from voronoi import (
     build_voronoi_roadmap,
     dilatar_obstaculos,
@@ -15,10 +15,10 @@ from voronoi import (
 # Configurações
 # ----------------------------------------------------------------------
 IMAGEM_CALIBRACAO = "novo/xadrez.png"
-IMAGEM_PROCESSAMENTO = "novo/mesa.png"
+IMAGEM_PROCESSAMENTO = "novo/mesa_ponto_vermelho2.png"
 LADO_QUADRADO_CM = 2.35
 ORIGEM_PIXELS = (860, 100)
-INICIO_CM = (-20.0, 23.0)
+INICIO_CM = (-30.0, 23.0)
 OBJETIVO_CM = (30.0, 86.0)
 RAIO_ROBO_CM = 5.0
 
@@ -62,7 +62,8 @@ def main():
             f"Não foi possível abrir a imagem de processamento: {IMAGEM_PROCESSAMENTO}"
         )
 
-    objetos, mascara = detectarFormas(frame)
+    centros_vermelhos, mascara_vermelha = detectarMarcadoresVermelhos(frame)
+    objetos, mascara = detectarFormas(frame, mascara_vermelha)
     obstaculos = [
         obj.poligono.reshape(-1, 2).astype(float)
         for obj in objetos
@@ -110,6 +111,19 @@ def main():
             calibracao.cm_para_pixel(*caminho_cm[i + 1], ORIGEM_PIXELS)
         ).astype(int))
         cv2.line(frame, p1, p2, (0, 0, 255), 3)
+
+    for centro in centros_vermelhos:
+        x_px, y_px = centro
+        x_cm, y_cm = calibracao.pixel_para_cm(
+            x_px, y_px, ORIGEM_PIXELS
+        )
+        cv2.circle(frame, centro, 6, (0, 0, 255), -1)
+        cv2.putText(
+            frame, f"Vermelho ({x_cm:.1f}, {y_cm:.1f}) cm",
+            (x_px + 10, y_px - 10), cv2.FONT_HERSHEY_SIMPLEX,
+            0.6, (0, 0, 255), 2
+        )
+        print(f"Centro vermelho: ({x_cm:.1f}, {y_cm:.1f}) cm")
 
     desenhar_referencial(frame, calibracao, ORIGEM_PIXELS)
     frame = desenharResultados(frame, objetos, calibracao)
