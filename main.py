@@ -14,8 +14,8 @@ IMAGEM_CALIBRACAO = "novo/xadrez.png"
 IMAGEM_PROCESSAMENTO = "novo/mesa.png"
 LADO_QUADRADO_CM = 2.35
 ORIGEM_PIXELS = (860, 100)
-INICIO_CM = (-20.0, -23.0)
-OBJETIVO_CM = (30.0, -86.0)
+INICIO_CM = (-20.0, 23.0)
+OBJETIVO_CM = (30.0, 86.0)
 
 
 def desenharResultados(

@@ -15,7 +15,7 @@ class Calibracao:
         ponto = np.array([x, y]) - origem
 
         eixo_x = np.array([np.cos(self.angulo_rad), np.sin(self.angulo_rad)])
-        eixo_y = np.array([np.sin(self.angulo_rad), -np.cos(self.angulo_rad)])
+        eixo_y = np.array([-np.sin(self.angulo_rad), np.cos(self.angulo_rad)])
 
         return (
             float(np.dot(ponto, eixo_x) / self.pixels_por_cm),
@@ -25,7 +25,7 @@ class Calibracao:
     def cm_para_pixel(self, x_cm, y_cm, origem_pixels):
         origem = np.asarray(origem_pixels, dtype=float)
         eixo_x = np.array([np.cos(self.angulo_rad), np.sin(self.angulo_rad)])
-        eixo_y = np.array([np.sin(self.angulo_rad), -np.cos(self.angulo_rad)])
+        eixo_y = np.array([-np.sin(self.angulo_rad), np.cos(self.angulo_rad)])
         ponto = origem + self.pixels_por_cm * (x_cm * eixo_x + y_cm * eixo_y)
         return float(ponto[0]), float(ponto[1])
 
@@ -115,7 +115,9 @@ def calibrar_xadrez(caminho, lado_quadrado_cm):
 def desenhar_referencial(frame, calibracao, origem_pixels):
     origem = np.asarray(origem_pixels, dtype=float)
     eixo_x = np.array([np.cos(calibracao.angulo_rad), np.sin(calibracao.angulo_rad)])
-    eixo_y = np.array([np.sin(calibracao.angulo_rad), -np.cos(calibracao.angulo_rad)])
+    eixo_y = np.array([
+        -np.sin(calibracao.angulo_rad), np.cos(calibracao.angulo_rad)
+    ])
     altura, largura = frame.shape[:2]
     comprimento = max(largura, altura)
     ponto_origem = tuple(np.round(origem).astype(int))
