@@ -15,7 +15,7 @@ from voronoi import (
 # Configurações
 # ----------------------------------------------------------------------
 IMAGEM_CALIBRACAO = "novo/xadrez.png"
-IMAGEM_PROCESSAMENTO = "novo/mesa_ponto_vermelho2.png"
+IMAGEM_PROCESSAMENTO = "novo/mesa_ponto_vermelho.png"
 LADO_QUADRADO_CM = 2.35
 ORIGEM_PIXELS = (860, 100)
 INICIO_CM = (-30.0, 23.0)
@@ -86,7 +86,13 @@ def main():
         contorno = np.round(poligono).astype(np.int32).reshape(-1, 1, 2)
         cv2.drawContours(frame, [contorno], -1, (255, 0, 255), 1)
 
-    inicio_px = calibracao.cm_para_pixel(*INICIO_CM, ORIGEM_PIXELS)
+    if centros_vermelhos:
+        inicio_px = centros_vermelhos[0]
+        print(f"Início da trajetória definido pelo marcador: {inicio_px} px")
+    else:
+        inicio_px = calibracao.cm_para_pixel(*INICIO_CM, ORIGEM_PIXELS)
+        print(f"Sem marcador; usando INICIO_CM como início: {INICIO_CM} cm")
+
     objetivo_px = calibracao.cm_para_pixel(*OBJETIVO_CM, ORIGEM_PIXELS)
 
     if (
@@ -117,10 +123,11 @@ def main():
         x_cm, y_cm = calibracao.pixel_para_cm(
             x_px, y_px, ORIGEM_PIXELS
         )
-        cv2.circle(frame, centro, 6, (0, 0, 255), -1)
+        centro_px = (int(round(x_px)), int(round(y_px)))
+        cv2.circle(frame, centro_px, 6, (0, 0, 255), -1)
         cv2.putText(
             frame, f"Vermelho ({x_cm:.1f}, {y_cm:.1f}) cm",
-            (x_px + 10, y_px - 10), cv2.FONT_HERSHEY_SIMPLEX,
+            (centro_px[0] + 10, centro_px[1] - 10), cv2.FONT_HERSHEY_SIMPLEX,
             0.6, (0, 0, 255), 2
         )
         print(f"Centro vermelho: ({x_cm:.1f}, {y_cm:.1f}) cm")
