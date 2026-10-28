@@ -14,6 +14,8 @@ IMAGEM_CALIBRACAO = "novo/xadrez.png"
 IMAGEM_PROCESSAMENTO = "novo/mesa.png"
 LADO_QUADRADO_CM = 2.35
 ORIGEM_PIXELS = (860, 100)
+INICIO_CM = (-20.0, -23.0)
+OBJETIVO_CM = (30.0, -86.0)
 
 
 def desenharResultados(
@@ -84,17 +86,30 @@ def main():
             p2 = tuple(np.round(b).astype(int))
             cv2.line(frame, p1, p2, (0, 255, 0), 2)
 
-        inicio = (600, 390)
-        objetivo = (600, 600)
+        inicio_px = calibracao.cm_para_pixel(*INICIO_CM, ORIGEM_PIXELS)
+        objetivo_px = calibracao.cm_para_pixel(*OBJETIVO_CM, ORIGEM_PIXELS)
 
-        if point_in_any_polygon(inicio, obstaculos) or point_in_any_polygon(objetivo, obstaculos):
+        if (
+            point_in_any_polygon(inicio_px, obstaculos)
+            or point_in_any_polygon(objetivo_px, obstaculos)
+        ):
             print("Caminho inválido")
 
-        caminho = dijkstra_on_edges(bordas, inicio, objetivo)
+        caminho_px = dijkstra_on_edges(bordas, inicio_px, objetivo_px)
+        caminho_cm = np.array([
+            calibracao.pixel_para_cm(x, y, ORIGEM_PIXELS)
+            for x, y in caminho_px
+        ], dtype=float).reshape(-1, 2)
 
-        for i in range(len(caminho) - 1):
-            p1 = tuple(np.round(caminho[i]).astype(int))
-            p2 = tuple(np.round(caminho[i + 1]).astype(int))
+        print(caminho_cm)
+
+        for i in range(len(caminho_cm) - 1):
+            p1 = tuple(np.round(
+                calibracao.cm_para_pixel(*caminho_cm[i], ORIGEM_PIXELS)
+            ).astype(int))
+            p2 = tuple(np.round(
+                calibracao.cm_para_pixel(*caminho_cm[i + 1], ORIGEM_PIXELS)
+            ).astype(int))
             cv2.line(frame, p1, p2, (0, 0, 255), 3)
 
         desenhar_referencial(frame, calibracao, ORIGEM_PIXELS)

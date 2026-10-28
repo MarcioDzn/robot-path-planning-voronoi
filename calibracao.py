@@ -22,6 +22,13 @@ class Calibracao:
             float(np.dot(ponto, eixo_y) / self.pixels_por_cm),
         )
 
+    def cm_para_pixel(self, x_cm, y_cm, origem_pixels):
+        origem = np.asarray(origem_pixels, dtype=float)
+        eixo_x = np.array([np.cos(self.angulo_rad), np.sin(self.angulo_rad)])
+        eixo_y = np.array([np.sin(self.angulo_rad), -np.cos(self.angulo_rad)])
+        ponto = origem + self.pixels_por_cm * (x_cm * eixo_x + y_cm * eixo_y)
+        return float(ponto[0]), float(ponto[1])
+
 
 def _maior_agrupamento(pontos, distancia_maxima):
     nao_visitados = set(range(len(pontos)))
