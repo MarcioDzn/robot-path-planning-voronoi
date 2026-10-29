@@ -188,8 +188,8 @@ def detectarFormas(frame, mascara_exclusao=None):
 
     # Retângulo preto no canto direito do THRESH, com mesma largura e altura menor.
     h, w = mascara_obstaculos.shape[:2]
-    largura = min(65, w // 6)
-    altura = max(20, h // 16)
+    largura = min(64, w // 6)
+    altura = max(20, h // 2)
     x0 = max(0, w - largura)
     y0 = max(0, (h - altura) // 2+80)
     x1 = w - 1

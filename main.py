@@ -20,7 +20,7 @@ LADO_QUADRADO_CM = 2.35
 ORIGEM_PIXELS = (210, 500)
 INICIO_CM = (-30.0, 23.0)
 OBJETIVO_CM = (30.0, 86.0)
-RAIO_ROBO_CM = 5.0
+RAIO_ROBO_CM = 12.5
 
 
 def desenharResultados(
