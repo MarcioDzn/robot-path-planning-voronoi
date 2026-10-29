@@ -48,6 +48,52 @@ def desenharResultados(
     return frame
 
 
+def selecionar_regiao(frame):
+    janela = "Selecione a região para processar"
+    ponto_inicial = None
+    ponto_atual = None
+
+    def _on_event(event, x, y, flags, param):
+        nonlocal ponto_inicial, ponto_atual
+        if event == cv2.EVENT_LBUTTONDOWN:
+            ponto_inicial = (x, y)
+            ponto_atual = (x, y)
+        elif event == cv2.EVENT_MOUSEMOVE and ponto_inicial is not None:
+            ponto_atual = (x, y)
+        elif event == cv2.EVENT_LBUTTONUP and ponto_inicial is not None:
+            ponto_atual = (x, y)
+
+    cv2.namedWindow(janela, cv2.WINDOW_NORMAL)
+    cv2.setMouseCallback(janela, _on_event)
+
+    while True:
+        display = frame.copy()
+
+        if ponto_inicial is not None and ponto_atual is not None:
+            x0 = min(ponto_inicial[0], ponto_atual[0])
+            x1 = max(ponto_inicial[0], ponto_atual[0])
+            y0 = min(ponto_inicial[1], ponto_atual[1])
+            y1 = max(ponto_inicial[1], ponto_atual[1])
+            cv2.rectangle(display, (x0, y0), (x1, y1), (0, 255, 0), 2)
+
+        cv2.imshow(janela, display)
+        tecla = cv2.waitKey(1) & 0xFF
+
+        if ponto_inicial is not None and ponto_atual is not None:
+            x0 = min(ponto_inicial[0], ponto_atual[0])
+            x1 = max(ponto_inicial[0], ponto_atual[0])
+            y0 = min(ponto_inicial[1], ponto_atual[1])
+            y1 = max(ponto_inicial[1], ponto_atual[1])
+
+            if tecla == ord('c'):
+                cv2.destroyWindow(janela)
+                return frame[y0:y1, x0:x1]
+
+        if tecla == ord('q'):
+            cv2.destroyWindow(janela)
+            return frame
+
+
 def main():
     calibracao = calibrar_xadrez(IMAGEM_CALIBRACAO, LADO_QUADRADO_CM)
     print(
@@ -61,6 +107,8 @@ def main():
         raise FileNotFoundError(
             f"Não foi possível abrir a imagem de processamento: {IMAGEM_PROCESSAMENTO}"
         )
+
+    frame = selecionar_regiao(frame)
 
     centros_vermelhos, mascara_vermelha = detectarMarcadoresVermelhos(frame)
     objetos, mascara = detectarFormas(frame, mascara_vermelha)
