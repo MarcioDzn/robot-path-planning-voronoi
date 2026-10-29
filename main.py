@@ -17,7 +17,7 @@ from voronoi import (
 IMAGEM_CALIBRACAO = "novo/xadrez2.png"
 IMAGEM_PROCESSAMENTO = "novo/mesa_ponto_vermelho3.png"
 LADO_QUADRADO_CM = 2.35
-ORIGEM_PIXELS = (860, 100)
+ORIGEM_PIXELS = (210, 500)
 INICIO_CM = (-30.0, 23.0)
 OBJETIVO_CM = (30.0, 86.0)
 RAIO_ROBO_CM = 5.0

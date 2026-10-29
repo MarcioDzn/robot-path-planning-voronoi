@@ -287,6 +287,5 @@ def detectarFormas(frame, mascara_exclusao=None):
         )
 
         # objetos.append(obj_exterior)
-
-
+    
     return objetos, mascara_obstaculos
