@@ -66,7 +66,7 @@ def calibrar_xadrez(caminho, lado_quadrado_cm):
     lado_minimo = min(altura, largura)
     area_imagem = altura * largura
 
-    _, mascara = cv2.threshold(imagem, 50, 255, cv2.THRESH_BINARY_INV)
+    _, mascara = cv2.threshold(imagem, 70, 255, cv2.THRESH_BINARY_INV)
     _, _, estatisticas, centros = cv2.connectedComponentsWithStats(mascara)
 
     candidatos = []

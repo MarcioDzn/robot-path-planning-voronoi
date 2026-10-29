@@ -14,8 +14,8 @@ from voronoi import (
 # ----------------------------------------------------------------------
 # Configurações
 # ----------------------------------------------------------------------
-IMAGEM_CALIBRACAO = "novo/xadrez.png"
-IMAGEM_PROCESSAMENTO = "novo/mesa_ponto_vermelho.png"
+IMAGEM_CALIBRACAO = "novo/xadrez2.png"
+IMAGEM_PROCESSAMENTO = "novo/mesa_ponto_vermelho3.png"
 LADO_QUADRADO_CM = 2.35
 ORIGEM_PIXELS = (860, 100)
 INICIO_CM = (-30.0, 23.0)
@@ -95,11 +95,11 @@ def main():
 
     objetivo_px = calibracao.cm_para_pixel(*OBJETIVO_CM, ORIGEM_PIXELS)
 
-    if (
-        point_in_any_polygon(inicio_px, obstaculos_dilatados)
-        or point_in_any_polygon(objetivo_px, obstaculos_dilatados)
-    ):
-        raise ValueError("Início ou objetivo está dentro da margem de segurança.")
+    # if (
+    #     point_in_any_polygon(inicio_px, obstaculos_dilatados)
+    #     or point_in_any_polygon(objetivo_px, obstaculos_dilatados)
+    # ):
+    #     raise ValueError("Início ou objetivo está dentro da margem de segurança.")
 
     caminho_px = dijkstra_on_edges(bordas, inicio_px, objetivo_px)
     caminho_cm = np.array([

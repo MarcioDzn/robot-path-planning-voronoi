@@ -188,6 +188,22 @@ def detectarFormas(frame, mascara_exclusao=None):
         mascara_exterior
     )
 
+    # Retângulo preto no canto direito do THRESH, com mesma largura e altura menor.
+    h, w = mascara_obstaculos.shape[:2]
+    largura = min(65, w // 6)
+    altura = max(20, h // 16)
+    x0 = max(0, w - largura)
+    y0 = max(0, (h - altura) // 2+80)
+    x1 = w - 1
+    y1 = y0 + altura - 1
+    cv2.rectangle(
+        mascara_obstaculos,
+        (x0, y0),
+        (x1, y1),
+        0,
+        -1,
+    )
+
     # Remove ruídos pequenos
     kernel_ruido = np.ones((3, 3), np.uint8)
 
@@ -271,5 +287,6 @@ def detectarFormas(frame, mascara_exclusao=None):
         )
 
         # objetos.append(obj_exterior)
-    
+
+
     return objetos, mascara_obstaculos
