@@ -3,6 +3,16 @@ from dataclasses import dataclass
 import cv2
 import numpy as np
 
+# ----------------------------------------------------------------------
+# Pré Processamento
+# ----------------------------------------------------------------------
+def adicionar_borda_preta(imagem):
+    return cv2.copyMakeBorder(
+        imagem,
+        1, 1, 1, 1,  # 1 pixel em cada lado
+        cv2.BORDER_CONSTANT,
+        value=(0, 0, 0)
+    )
 
 @dataclass(frozen=True)
 class Calibracao:
@@ -58,7 +68,7 @@ def _maior_agrupamento(pontos, distancia_maxima):
 
 
 def calibrar_xadrez(caminho, lado_quadrado_cm):
-    imagem = cv2.imread(str(caminho), cv2.IMREAD_GRAYSCALE)
+    imagem = adicionar_borda_preta(cv2.imread(str(caminho), cv2.IMREAD_GRAYSCALE))
     if imagem is None:
         raise FileNotFoundError(f"Não foi possível abrir a imagem de calibração: {caminho}")
     if lado_quadrado_cm <= 0:

@@ -1,13 +1,14 @@
 import cv2
 import numpy as np
 from aux_class import Objeto
-from calibracao import Calibracao, calibrar_xadrez, desenhar_referencial
+from calibracao import Calibracao, calibrar_xadrez, desenhar_referencial, adicionar_borda_preta
 from proc_img import detectarFormas, detectarMarcadoresVermelhos
 from voronoi import (
     build_voronoi_roadmap,
-    dilatar_obstaculos,
+    construir_obstaculos_dilatados,
     dijkstra_on_edges,
-    point_in_any_polygon,
+    livre,
+    extrair_contornos_sites, conectar_ao_roadmap
 )
 
 
@@ -19,8 +20,8 @@ IMAGEM_PROCESSAMENTO = "novo/mesa_ponto_vermelho3.png"
 LADO_QUADRADO_CM = 2.35
 ORIGEM_PIXELS = (210, 500)
 INICIO_CM = (-30.0, 23.0)
-OBJETIVO_CM = (30.0, 86.0)
-RAIO_ROBO_CM = 12.5
+OBJETIVO_CM = (-55.0, 0.0)
+RAIO_ROBO_CM = 4.5
 
 
 def desenharResultados(
@@ -102,38 +103,37 @@ def main():
         f"quadrados detectados: {calibracao.quadrados_detectados}"
     )
 
-    frame = cv2.imread(IMAGEM_PROCESSAMENTO)
+    frame = adicionar_borda_preta(cv2.imread(IMAGEM_PROCESSAMENTO))
     if frame is None:
         raise FileNotFoundError(
             f"Não foi possível abrir a imagem de processamento: {IMAGEM_PROCESSAMENTO}"
         )
 
-    frame = selecionar_regiao(frame)
-
     centros_vermelhos, mascara_vermelha = detectarMarcadoresVermelhos(frame)
-    objetos, mascara = detectarFormas(frame, mascara_vermelha)
-    obstaculos = [
-        obj.poligono.reshape(-1, 2).astype(float)
-        for obj in objetos
-    ]
+    objetos, mascara, arena = detectarFormas(frame, mascara_vermelha)
 
     altura, largura = frame.shape[:2]
     limites = (0, 0, largura - 1, altura - 1)
     raio_robo_px = RAIO_ROBO_CM * calibracao.pixels_por_cm
-    obstaculos_dilatados = dilatar_obstaculos(
-        obstaculos, raio_robo_px, (largura, altura)
-    )
-    bordas = build_voronoi_roadmap(obstaculos_dilatados, limites)
+
+    proibido = construir_obstaculos_dilatados(mascara, arena, raio_robo_px)
+    obstaculos_para_sites = extrair_contornos_sites(proibido)
+    
+
+    bordas = build_voronoi_roadmap(obstaculos_para_sites, limites, proibido)
 
     for a, b in bordas:
         p1 = tuple(np.round(a).astype(int))
         p2 = tuple(np.round(b).astype(int))
         cv2.line(frame, p1, p2, (0, 255, 0), 2)
 
-    for poligono in obstaculos_dilatados:
-        contorno = np.round(poligono).astype(np.int32).reshape(-1, 1, 2)
-        cv2.drawContours(frame, [contorno], -1, (255, 0, 255), 1)
+    # ---------- Debug visual: região proibida ----------
+    contornos_proibido, _ = cv2.findContours(
+        proibido, cv2.RETR_CCOMP, cv2.CHAIN_APPROX_SIMPLE
+    )
+    cv2.drawContours(frame, contornos_proibido, -1, (255, 0, 255), 1)
 
+    # ---------- Início e objetivo ----------
     if centros_vermelhos:
         inicio_px = centros_vermelhos[0]
         print(f"Início da trajetória definido pelo marcador: {inicio_px} px")
@@ -143,50 +143,78 @@ def main():
 
     objetivo_px = calibracao.cm_para_pixel(*OBJETIVO_CM, ORIGEM_PIXELS)
 
-    # if (
-    #     point_in_any_polygon(inicio_px, obstaculos_dilatados)
-    #     or point_in_any_polygon(objetivo_px, obstaculos_dilatados)
-    # ):
-    #     raise ValueError("Início ou objetivo está dentro da margem de segurança.")
+    # if not livre(inicio_px, proibido):
+    #     print("Aviso: o início está na margem de segurança.")
+    # if not livre(objetivo_px, proibido):
+    #     raise ValueError("O objetivo está dentro da margem de segurança.")
 
-    caminho_px = dijkstra_on_edges(bordas, inicio_px, objetivo_px)
-    caminho_cm = np.array([
-        calibracao.pixel_para_cm(x, y, ORIGEM_PIXELS)
-        for x, y in caminho_px
-    ], dtype=float).reshape(-1, 2)
+    # ---------- Liga início/objetivo ao roadmap ----------
+    arestas_inicio = conectar_ao_roadmap(inicio_px, bordas, proibido)
+    arestas_objetivo = conectar_ao_roadmap(objetivo_px, bordas, proibido)
 
-    print(caminho_cm)
+    # if not arestas_inicio or not arestas_objetivo:
+    #     raise ValueError(
+    #         "Início ou objetivo não consegue se conectar ao roadmap."
+    #     )
 
-    for i in range(len(caminho_cm) - 1):
-        p1 = tuple(np.round(
-            calibracao.cm_para_pixel(*caminho_cm[i], ORIGEM_PIXELS)
-        ).astype(int))
-        p2 = tuple(np.round(
-            calibracao.cm_para_pixel(*caminho_cm[i + 1], ORIGEM_PIXELS)
-        ).astype(int))
-        cv2.line(frame, p1, p2, (0, 0, 255), 3)
+    bordas_busca = bordas + arestas_inicio + arestas_objetivo
 
-    for centro in centros_vermelhos:
-        x_px, y_px = centro
-        x_cm, y_cm = calibracao.pixel_para_cm(
-            x_px, y_px, ORIGEM_PIXELS
-        )
-        centro_px = (int(round(x_px)), int(round(y_px)))
-        cv2.circle(frame, centro_px, 6, (0, 0, 255), -1)
-        cv2.putText(
-            frame, f"Vermelho ({x_cm:.1f}, {y_cm:.1f}) cm",
-            (centro_px[0] + 10, centro_px[1] - 10), cv2.FONT_HERSHEY_SIMPLEX,
-            0.6, (0, 0, 255), 2
-        )
-        print(f"Centro vermelho: ({x_cm:.1f}, {y_cm:.1f}) cm")
+    # ---------- Caminho ----------
+    caminho_px = dijkstra_on_edges(bordas_busca, inicio_px, objetivo_px)
 
+    if caminho_px is None or len(caminho_px) < 2:
+        print("Nenhum caminho encontrado.")
+        caminho_cm = np.empty((0, 2))
+    else:
+        caminho_cm = np.array([
+            calibracao.pixel_para_cm(x, y, ORIGEM_PIXELS)
+            for x, y in caminho_px
+        ], dtype=float).reshape(-1, 2)
+        print(caminho_cm)
+
+        for p, q in zip(caminho_px[:-1], caminho_px[1:]):
+            cv2.line(
+                frame,
+                tuple(np.round(p).astype(int)),
+                tuple(np.round(q).astype(int)),
+                (0, 0, 255), 3
+            )
+
+    # ---------- Marcadores vermelhos ----------
+    centro = centros_vermelhos[0]
+    x_px, y_px = centro
+    x_cm, y_cm = calibracao.pixel_para_cm(x_px, y_px, ORIGEM_PIXELS)
+    centro_px = (int(round(x_px)), int(round(y_px)))
+    cv2.circle(frame, centro_px, 6, (0, 0, 255), -1)
+    cv2.putText(
+        frame, f"Vermelho ({x_cm:.1f}, {y_cm:.1f}) cm",
+        (centro_px[0] + 10, centro_px[1] - 10),
+        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 2
+    )
+    print(f"Centro vermelho: ({x_cm:.1f}, {y_cm:.1f}) cm")
+
+    #----Exibir destino----
+    x_px, y_px = objetivo_px
+    x_cm, y_cm = calibracao.pixel_para_cm(x_px, y_px, ORIGEM_PIXELS)
+    centro_px = (int(round(x_px)), int(round(y_px)))
+    cv2.circle(frame, centro_px, 6, (255, 0, 0), -1)
+    cv2.putText(
+        frame, f"Destino ({x_cm:.1f}, {y_cm:.1f}) cm",
+        (centro_px[0] + 10, centro_px[1] - 10),
+        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 2
+    )
+    print(f"Centro destino: ({x_cm:.1f}, {y_cm:.1f}) cm")
+
+
+    # ---------- Exibição ----------
     desenhar_referencial(frame, calibracao, ORIGEM_PIXELS)
     frame = desenharResultados(frame, objetos, calibracao)
-    cv2.imshow("mascara", mascara)
+
+    cv2.imshow("mascara obstaculos", mascara)
+    cv2.imshow("regiao proibida", proibido)
     cv2.imshow("Mapeamento pixel para cm", frame)
     cv2.waitKey(0)
     cv2.destroyAllWindows()
-
 
 if __name__ == "__main__":
     main()
