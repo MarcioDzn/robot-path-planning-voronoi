@@ -67,10 +67,9 @@ def _maior_agrupamento(pontos, distancia_maxima):
     return max(agrupamentos, key=len)
 
 
-def calibrar_xadrez(caminho, lado_quadrado_m):
-    imagem = adicionar_borda_preta(cv2.imread(str(caminho), cv2.IMREAD_GRAYSCALE))
+def calibrar_xadrez(imagem, lado_quadrado_m):
     if imagem is None:
-        raise FileNotFoundError(f"Não foi possível abrir a imagem de calibração: {caminho}")
+        raise FileNotFoundError(f"Não foi possível abrir a imagem de calibração.")
     if lado_quadrado_m <= 0:
         raise ValueError("O lado do quadrado deve ser maior que zero.")
 

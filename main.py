@@ -15,6 +15,8 @@ from voronoi import (
 # ----------------------------------------------------------------------
 # Configurações
 # ----------------------------------------------------------------------
+CAM_INDEX = 0
+
 IMAGEM_CALIBRACAO = "novo/xadrez2.png"
 IMAGEM_PROCESSAMENTO = "novo/mesa_ponto_vermelho3.png"
 LADO_QUADRADO_M = 2.35 / 100
@@ -48,18 +50,48 @@ def desenharResultados(
 
     return frame
 
-def main():
-    calibracao = calibrar_xadrez(IMAGEM_CALIBRACAO, LADO_QUADRADO_M)
-    print(
-        f"Calibração: {calibracao.pixels_por_m:.2f} px/m; "
-        f"ângulo dos eixos: {np.degrees(calibracao.angulo_rad):.2f}°; "
-        f"quadrados detectados: {calibracao.quadrados_detectados}"
-    )
+def abrir_camera():
+    """Devolve um VideoCapture funcionando ou None se não der."""
+    try:
+        video = cv2.VideoCapture(CAM_INDEX)
+        if not video.isOpened():
+            raise RuntimeError("câmera não abriu")
+        ok, _ = video.read()
+        if not ok:
+            raise RuntimeError("câmera abriu mas não entregou frame")
+        return video
+    except Exception as e:
+        print(f"Câmera indisponível ({e}); usando imagens estáticas.")
+        return None
 
-    frame = adicionar_borda_preta(cv2.imread(IMAGEM_PROCESSAMENTO))
+
+def aguardar_calibracao(video):
+    """Mostra o vídeo ao vivo até apertar N (devolve o frame) ou Q (devolve None)."""
+    while True:
+        ok, frame = video.read()
+        if not ok:
+            print("Falha ao ler frame da câmera.")
+            return None
+
+        preview = frame.copy()
+        cv2.putText(
+            preview, "N = calibrar com este frame | Q = sair",
+            (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2
+        )
+        cv2.imshow("Aguardando calibracao", preview)
+
+        tecla = cv2.waitKey(1) & 0xFF
+        if tecla in (ord("n"), ord("N")):
+            cv2.destroyWindow("Aguardando calibracao")
+            return frame
+        if tecla in (ord("q"), ord("Q")):
+            return None
+
+def processar_frame(frame_bruto, calibracao):
+    frame = adicionar_borda_preta(frame_bruto)
     if frame is None:
         raise FileNotFoundError(
-            f"Não foi possível abrir a imagem de processamento: {IMAGEM_PROCESSAMENTO}"
+            f"Não foi possível abrir a imagem de processamento"
         )
 
     centros_vermelhos, mascara_vermelha = detectarMarcadoresVermelhos(frame)
@@ -163,11 +195,72 @@ def main():
     desenhar_referencial(frame, calibracao, ORIGEM_PIXELS)
     frame = desenharResultados(frame, objetos, calibracao)
 
-    cv2.imshow("mascara obstaculos", mascara)
-    cv2.imshow("regiao proibida", proibido)
-    cv2.imshow("Mapeamento pixel para m", frame)
-    cv2.waitKey(0)
-    cv2.destroyAllWindows()
+    return frame, mascara, proibido
+
+def main():
+    video = abrir_camera()
+
+    # ---------------- Sem câmera: imagens estáticas ----------------
+    if video is None:
+        imagem_calib = cv2.imread(str(IMAGEM_CALIBRACAO), cv2.IMREAD_GRAYSCALE)
+        if imagem_calib is None:
+            raise FileNotFoundError(
+                f"Não foi possível abrir a imagem de calibração: {IMAGEM_CALIBRACAO}"
+            )
+        if imagem_calib.ndim == 3:
+            imagem_calib = cv2.cvtColor(imagem_calib, cv2.COLOR_BGR2GRAY)
+
+
+        calibracao = calibrar_xadrez(adicionar_borda_preta(imagem_calib), LADO_QUADRADO_M)
+
+
+        frame_bruto = cv2.imread(IMAGEM_PROCESSAMENTO)
+        if frame_bruto is None:
+            raise FileNotFoundError(
+                f"Não foi possível abrir a imagem: {IMAGEM_PROCESSAMENTO}"
+            )
+
+        frame, mascara, proibido = processar_frame(frame_bruto, calibracao)
+        cv2.imshow("mascara obstaculos", mascara)
+        cv2.imshow("regiao proibida", proibido)
+        cv2.imshow("Mapeamento pixel para m", frame)
+        cv2.waitKey(0)
+        cv2.destroyAllWindows()
+        return
+
+    # ---------------- Com câmera ----------------
+    try:
+        frame_calib = aguardar_calibracao(video)
+        if frame_calib is None:
+            return
+        if frame_calib.ndim == 3:
+            frame_calib = cv2.cvtColor(frame_calib, cv2.COLOR_BGR2GRAY)
+
+        calibracao = calibrar_xadrez(adicionar_borda_preta(frame_calib), LADO_QUADRADO_M)
+
+        print(
+            f"Calibração: {calibracao.pixels_por_m:.2f} px/m; "
+            f"ângulo dos eixos: {np.degrees(calibracao.angulo_rad):.2f}°; "
+            f"quadrados detectados: {calibracao.quadrados_detectados}"
+        )
+
+        while True:
+            ok, frame_bruto = video.read()
+            if not ok:
+                print("Falha ao ler frame; encerrando.")
+                break
+
+            frame, mascara, proibido = processar_frame(frame_bruto, calibracao)
+
+            cv2.imshow("mascara obstaculos", mascara)
+            cv2.imshow("regiao proibida", proibido)
+            cv2.imshow("Mapeamento pixel para m", frame)
+
+            if cv2.waitKey(1) & 0xFF in (ord("q"), ord("Q")):
+                break
+    finally:
+        video.release()
+        cv2.destroyAllWindows()
 
 if __name__ == "__main__":
     main()
