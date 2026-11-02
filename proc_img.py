@@ -14,7 +14,6 @@ EPSILON_FACTOR = 0.002
 LIMITE_PRETO = 95
 
 
-
 # ----------------------------------------------------------------------
 # Detecção e classificação de formas
 # ----------------------------------------------------------------------
@@ -147,7 +146,7 @@ def detectarFormas(frame, mascara_exclusao=None):
     )
 
     if not contornos_arena:
-        return [], np.zeros_like(gray)
+        return [], np.zeros_like(gray), np.zeros_like(gray)
 
     # A maior região branca é considerada a arena
     contorno_arena = max(
@@ -164,11 +163,6 @@ def detectarFormas(frame, mascara_exclusao=None):
         cv2.FILLED
     )
 
-    # --------------------------------------------------
-    # Obstáculo externo: tudo fora da arena
-    # --------------------------------------------------
-    mascara_exterior = cv2.bitwise_not(mascara_arena)
-
     
     # --------------------------------------------------
     # 2. Detecta obstáculos pretos dentro da arena
@@ -179,11 +173,6 @@ def detectarFormas(frame, mascara_exclusao=None):
 
     mascara_obstaculos = cv2.bitwise_and(
         mascara_pretos, mascara_arena
-    )
-
-    mascara_obstaculos = cv2.bitwise_or(
-        mascara_obstaculos,
-        mascara_exterior
     )
 
     # Remove ruídos pequenos
@@ -206,7 +195,7 @@ def detectarFormas(frame, mascara_exclusao=None):
     # --------------------------------------------------
     contours, _ = cv2.findContours(
         mascara_obstaculos,
-        cv2.RETR_EXTERNAL,
+        cv2.RETR_LIST,
         cv2.CHAIN_APPROX_SIMPLE
     )
 
@@ -244,30 +233,4 @@ def detectarFormas(frame, mascara_exclusao=None):
         objetos.append(obj)
     
     
-    contorno_exterior = contorno_arena
-
-    # Obstáculo correspondente ao exterior da arena
-    M = cv2.moments(contorno_exterior)
-
-    if M["m00"] != 0:
-        cx = int(M["m10"] / M["m00"])
-        cy = int(M["m01"] / M["m00"])
-
-        area_exterior = (
-            frame.shape[0] * frame.shape[1]
-            - cv2.contourArea(contorno_exterior)
-        )
-
-        obj_exterior = Objeto(
-            "Exterior",
-            [cx, cy],
-            contorno_exterior,
-            contorno_exterior,
-            len(contorno_exterior),
-            area_exterior,
-            (0, 0, 255)
-        )
-
-        # objetos.append(obj_exterior)
-    
-    return objetos, mascara_obstaculos
+    return objetos, mascara_obstaculos, mascara_arena

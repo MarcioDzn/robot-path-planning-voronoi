@@ -3,14 +3,24 @@ from dataclasses import dataclass
 import cv2
 import numpy as np
 
+# ----------------------------------------------------------------------
+# Pré Processamento
+# ----------------------------------------------------------------------
+def adicionar_borda_preta(imagem):
+    return cv2.copyMakeBorder(
+        imagem,
+        1, 1, 1, 1,  # 1 pixel em cada lado
+        cv2.BORDER_CONSTANT,
+        value=(0, 0, 0)
+    )
 
 @dataclass(frozen=True)
 class Calibracao:
-    pixels_por_cm: float
+    pixels_por_m: float
     angulo_rad: float
     quadrados_detectados: int
 
-    def pixel_para_cm(self, x, y, origem_pixels):
+    def pixel_para_m(self, x, y, origem_pixels):
         origem = np.asarray(origem_pixels, dtype=float)
         ponto = np.array([x, y]) - origem
 
@@ -20,15 +30,15 @@ class Calibracao:
         # Inverte a direção dos eixos para que o sentido positivo fique
         # para a direita no X e para cima no Y.
         return (
-            float(-np.dot(ponto, eixo_x) / self.pixels_por_cm),
-            float(-np.dot(ponto, eixo_y) / self.pixels_por_cm),
+            float(-np.dot(ponto, eixo_x) / self.pixels_por_m),
+            float(-np.dot(ponto, eixo_y) / self.pixels_por_m),
         )
 
-    def cm_para_pixel(self, x_cm, y_cm, origem_pixels):
+    def m_para_pixel(self, x_m, y_m, origem_pixels):
         origem = np.asarray(origem_pixels, dtype=float)
         eixo_x = np.array([np.cos(self.angulo_rad), np.sin(self.angulo_rad)])
         eixo_y = np.array([-np.sin(self.angulo_rad), np.cos(self.angulo_rad)])
-        ponto = origem - self.pixels_por_cm * (x_cm * eixo_x + y_cm * eixo_y)
+        ponto = origem - self.pixels_por_m * (x_m * eixo_x + y_m * eixo_y)
         return float(ponto[0]), float(ponto[1])
 
 
@@ -57,11 +67,10 @@ def _maior_agrupamento(pontos, distancia_maxima):
     return max(agrupamentos, key=len)
 
 
-def calibrar_xadrez(caminho, lado_quadrado_cm):
-    imagem = cv2.imread(str(caminho), cv2.IMREAD_GRAYSCALE)
+def calibrar_xadrez(imagem, lado_quadrado_m):
     if imagem is None:
-        raise FileNotFoundError(f"Não foi possível abrir a imagem de calibração: {caminho}")
-    if lado_quadrado_cm <= 0:
+        raise FileNotFoundError(f"Não foi possível abrir a imagem de calibração.")
+    if lado_quadrado_m <= 0:
         raise ValueError("O lado do quadrado deve ser maior que zero.")
 
     altura, largura = imagem.shape
@@ -106,9 +115,9 @@ def calibrar_xadrez(caminho, lado_quadrado_cm):
         eixo_x = -eixo_x
     angulo_rad = float(np.arctan2(eixo_x[1], eixo_x[0]))
 
-    escala = lado_px_estimado / lado_quadrado_cm
+    escala = lado_px_estimado / lado_quadrado_m
     return Calibracao(
-        pixels_por_cm=escala,
+        pixels_por_m=escala,
         angulo_rad=angulo_rad,
         quadrados_detectados=len(centros_xadrez),
     )
@@ -142,7 +151,7 @@ def desenhar_referencial(frame, calibracao, origem_pixels):
         frame, ponto_origem, (0, 0, 255), cv2.MARKER_CROSS, 18, 2
     )
     cv2.putText(
-        frame, "Origem (0, 0) cm",
+        frame, "Origem (0, 0) m",
         (ponto_origem[0] + 8, ponto_origem[1] - 8),
         cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2
     )
