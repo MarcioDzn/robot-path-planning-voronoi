@@ -37,6 +37,30 @@ PORTA_SERIAL = "COM11"
 BAUD_RATE = 115200
 
 
+def simplificar_caminho(caminho_px, max_pontos=12):
+    """
+    Simplifica o caminho mantendo as quinas principais e limitando
+    o número de pontos ao máximo especificado (ex: 12).
+    """
+    if len(caminho_px) <= max_pontos:
+        return caminho_px
+
+    # Converte o array para o formato aceito pelo cv2.approxPolyDP
+    pts = caminho_px.astype(np.float32).reshape(-1, 1, 2)
+    
+    # Começa com uma tolerância (epsilon) inicial e vai ajustando 
+    # iterativamente até o número de pontos ficar menor ou igual a max_pontos
+    epsilon = 1.0
+    for _ in range(50):  # Limite de segurança para evitar loop infinito
+        aprox = cv2.approxPolyDP(pts, epsilon, closed=False)
+        if len(aprox) <= max_pontos:
+            break
+        epsilon += 1.05  # Aumenta a tolerância para remover mais pontos
+        
+    # Retorna no formato (N, 2)
+    return aprox.reshape(-1, 2)
+
+
 def formatar_waypoints(caminho_m):
     waypoints_formatados = []
     n_pts = len(caminho_m)
@@ -191,6 +215,8 @@ def processar_frame(frame_bruto, calibracao):
         print("Nenhum caminho encontrado.")
         caminho_m = np.empty((0, 2))
     else:
+        caminho_px = simplificar_caminho(np.array(caminho_px), max_pontos=12)
+        
         caminho_m = np.array(
             [calibracao.pixel_para_m(x, y, ORIGEM_PIXELS) for x, y in caminho_px],
             dtype=float,
