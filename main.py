@@ -28,7 +28,7 @@ IMAGEM_PROCESSAMENTO = "novo/mesa_ponto_vermelho3.png"
 LADO_QUADRADO_M = 2.35 / 100
 ORIGEM_PIXELS = (210, 500)
 INICIO_M = (-30.0 / 100, 23.0 / 100)
-OBJETIVO_M = (-55.0 / 100, 0.0 / 100)
+OBJETIVO_M = (0,0)#(-55.0 / 100, 0.0 / 100)
 RAIO_ROBO_M = 12.5 / 100
 
 # Variáveis de configuração da comunicação com o robô
