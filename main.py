@@ -26,16 +26,17 @@ CAM_INDEX = 0
 IMAGEM_CALIBRACAO = "novo/xadrez2.png"
 IMAGEM_PROCESSAMENTO = "novo/mesa_ponto_vermelho3.png"
 LADO_QUADRADO_M = 2.35 / 100
-ORIGEM_PIXELS = (210, 500)
+ORIGEM_PIXELS = (500, 500)
 INICIO_M = (-30.0 / 100, 23.0 / 100)
-OBJETIVO_M = (0,0)#(-55.0 / 100, 0.0 / 100)
+OBJETIVO_M = (0,0) #(-55.0 / 100, 0.0 / 100)
 RAIO_ROBO_M = 12.5 / 100
 
 # Variáveis de configuração da comunicação com o robô
-ENVIAR_PARA_ROBO = False
-PORTA_SERIAL = "COM11"
-BAUD_RATE = 115200
+ENVIAR_PARA_ROBO = True
+PORTA_SERIAL = "/dev/ttyUSB0"
+BAUD_RATE = 57600
 
+global FLAG
 
 def simplificar_caminho(caminho_px, max_pontos=12):
     """
@@ -225,7 +226,14 @@ def processar_frame(frame_bruto, calibracao):
 
         waypoints_formatados = formatar_waypoints(caminho_m)
 
-        enviar_missao_robo(waypoints_formatados, ENVIAR_PARA_ROBO, PORTA_SERIAL, BAUD_RATE)
+
+        tecla = cv2.waitKey(1) & 0xFF
+        if tecla in (ord("s"), ord("S")) and FLAG == 0:
+            FLAG = 1
+            enviar_missao_robo(waypoints_formatados, ENVIAR_PARA_ROBO, PORTA_SERIAL, BAUD_RATE)
+
+        elif tecla in (ord("r"), ord("R")):
+            FLAG = 0
 
         for p, q in zip(caminho_px[:-1], caminho_px[1:]):
             cv2.line(
@@ -277,6 +285,7 @@ def processar_frame(frame_bruto, calibracao):
 
 
 def main():
+    FLAG = 0
     video = abrir_camera()
 
     # ---------------- Sem câmera: imagens estáticas ----------------

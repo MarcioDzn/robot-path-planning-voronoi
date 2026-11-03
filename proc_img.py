@@ -1,17 +1,14 @@
 import cv2
 import numpy as np
-from matplotlib.path import Path
-from scipy.spatial import Voronoi
-import heapq
 from aux_class import Objeto
 
 
 # ----------------------------------------------------------------------
 # Configurações
 # ----------------------------------------------------------------------
-MIN_AREA = 100
+MIN_AREA = 1000
 EPSILON_FACTOR = 0.002
-LIMITE_PRETO = 95
+LIMITE_PRETO = 55
 
 
 # ----------------------------------------------------------------------
