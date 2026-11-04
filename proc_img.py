@@ -9,6 +9,7 @@ from aux_class import Objeto
 MIN_AREA = 1000
 EPSILON_FACTOR = 0.002
 LIMITE_PRETO = 55
+RAIO_IGNORAR = 80
 
 
 # ----------------------------------------------------------------------
@@ -118,7 +119,7 @@ def detectarMarcadoresVermelhos(frame):
     return centros, mascara_marcadores
 
 
-def detectarFormas(frame, mascara_exclusao=None):
+def detectarFormas(frame, mascara_exclusao=None, ponto_central=None, raio_metros=0):
     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
     blur = cv2.GaussianBlur(gray, (5, 5), 0)
 
@@ -187,6 +188,14 @@ def detectarFormas(frame, mascara_exclusao=None):
             mascara_obstaculos, cv2.bitwise_not(mascara_exclusao)
         )
 
+    circulo = np.zeros_like(mascara_obstaculos)
+    centro = (int(round(ponto_central[0])), int(round(ponto_central[1])))
+    cv2.circle(circulo, centro, int(round(raio_metros*1.7)), 255, thickness=-1)
+
+    mascara_obstaculos = cv2.bitwise_and(
+        mascara_obstaculos, cv2.bitwise_not(circulo)
+    )
+
     # --------------------------------------------------
     # 3. Extrai e classifica os obstáculos
     # --------------------------------------------------
@@ -230,4 +239,4 @@ def detectarFormas(frame, mascara_exclusao=None):
         objetos.append(obj)
     
     
-    return objetos, mascara_obstaculos, mascara_arena
+    return objetos, mascara_obstaculos, mascara_arena, circulo

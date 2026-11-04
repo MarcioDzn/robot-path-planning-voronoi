@@ -41,6 +41,9 @@ class Calibracao:
         ponto = origem - self.pixels_por_m * (x_m * eixo_x + y_m * eixo_y)
         return float(ponto[0]), float(ponto[1])
 
+    def m_para_pixels_inteiro(self, distancia_m):
+        return int(round(distancia_m * self.pixels_por_m))
+
 
 def _maior_agrupamento(pontos, distancia_maxima):
     nao_visitados = set(range(len(pontos)))

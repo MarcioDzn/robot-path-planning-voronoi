@@ -171,7 +171,19 @@ def processar_frame(frame_bruto, calibracao):
         raise FileNotFoundError("Não foi possível abrir a imagem de processamento")
 
     centros_vermelhos, mascara_vermelha = detectarMarcadoresVermelhos(frame)
-    objetos, mascara, arena = detectarFormas(frame, mascara_vermelha)
+
+    # ---------- Início e objetivo ----------
+    if centros_vermelhos:
+        inicio_px = centros_vermelhos[0]
+        print(f"Início da trajetória definido pelo marcador: {inicio_px} px")
+    else:
+        inicio_px = calibracao.m_para_pixel(*INICIO_M, ORIGEM_PIXELS)
+        print(f"Sem marcador; usando INICIO_M como início: {INICIO_M} m")
+
+    objetivo_px = calibracao.m_para_pixel(*OBJETIVO_M, ORIGEM_PIXELS)
+
+
+    objetos, mascara, arena, circulo = detectarFormas(frame, mascara_vermelha, inicio_px, calibracao.m_para_pixels_inteiro(RAIO_ROBO_M))
 
     altura, largura = frame.shape[:2]
     limites = (0, 0, largura - 1, altura - 1)
@@ -192,16 +204,6 @@ def processar_frame(frame_bruto, calibracao):
         proibido, cv2.RETR_CCOMP, cv2.CHAIN_APPROX_SIMPLE
     )
     cv2.drawContours(frame, contornos_proibido, -1, (255, 0, 255), 1)
-
-    # ---------- Início e objetivo ----------
-    if centros_vermelhos:
-        inicio_px = centros_vermelhos[0]
-        print(f"Início da trajetória definido pelo marcador: {inicio_px} px")
-    else:
-        inicio_px = calibracao.m_para_pixel(*INICIO_M, ORIGEM_PIXELS)
-        print(f"Sem marcador; usando INICIO_M como início: {INICIO_M} m")
-
-    objetivo_px = calibracao.m_para_pixel(*OBJETIVO_M, ORIGEM_PIXELS)
 
     # ---------- Liga início/objetivo ao roadmap ----------
     arestas_inicio = conectar_ao_roadmap(inicio_px, bordas, proibido)
@@ -245,8 +247,7 @@ def processar_frame(frame_bruto, calibracao):
             )
 
     # ---------- Marcadores vermelhos ----------
-    centro = centros_vermelhos[0]
-    x_px, y_px = centro
+    x_px, y_px = inicio_px
     x_m, y_m = calibracao.pixel_para_m(x_px, y_px, ORIGEM_PIXELS)
     centro_px = (int(round(x_px)), int(round(y_px)))
     cv2.circle(frame, centro_px, 6, (0, 0, 255), -1)
@@ -281,7 +282,7 @@ def processar_frame(frame_bruto, calibracao):
     desenhar_referencial(frame, calibracao, ORIGEM_PIXELS)
     frame = desenharResultados(frame, objetos, calibracao)
 
-    return frame, mascara, proibido
+    return frame, mascara, proibido, circulo
 
 
 def main():
@@ -308,9 +309,10 @@ def main():
                 f"Não foi possível abrir a imagem: {IMAGEM_PROCESSAMENTO}"
             )
 
-        frame, mascara, proibido = processar_frame(frame_bruto, calibracao)
+        frame, mascara, proibido, circulo = processar_frame(frame_bruto, calibracao)
         cv2.imshow("mascara obstaculos", mascara)
         cv2.imshow("regiao proibida", proibido)
+        cv2.imshow("Exclusao robô", circulo)
         cv2.imshow("Mapeamento pixel para m", frame)
         cv2.waitKey(0)
         cv2.destroyAllWindows()
@@ -340,10 +342,11 @@ def main():
                 print("Falha ao ler frame; encerrando.")
                 break
 
-            frame, mascara, proibido = processar_frame(frame_bruto, calibracao)
+            frame, mascara, proibido, circulo = processar_frame(frame_bruto, calibracao)
 
             cv2.imshow("mascara obstaculos", mascara)
             cv2.imshow("regiao proibida", proibido)
+            cv2.imshow("Exclusao robô", circulo)
             cv2.imshow("Mapeamento pixel para m", frame)
 
             if cv2.waitKey(1) & 0xFF in (ord("q"), ord("Q")):
