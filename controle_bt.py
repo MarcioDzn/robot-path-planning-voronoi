@@ -244,12 +244,106 @@ def wait_until_done_telemetry(ser, poll_s=0.5, timeout_s=120.0,
     return False
 
 
+def follow_waypoints(ser, waypoints,
+                     poll_s=0.3,
+                     timeout_per_wp=60.0,
+                     position_tol=0.03,
+                     angle_tol=3.0,
+                     verbose=True):
+
+    if not waypoints:
+        return False, "Lista de waypoints vazia"
+
+    for idx, (x_goal, y_goal, th_goal) in enumerate(waypoints):
+
+        if verbose:
+            print(f"\n[{idx+1}/{len(waypoints)}] "
+                  f"Indo para x={x_goal:.3f}, "
+                  f"y={y_goal:.3f}, th={th_goal:.1f}")
+
+        # 1. Envia GOTO
+        resp = goto(ser, x_goal, y_goal, th_goal)
+
+        if resp != "<OK>":
+            return False, f"Erro ao enviar GOTO: {resp}"
+
+        # 2. Aguarda chegada ao waypoint
+        t0 = time.time()
+        arrived = False
+
+        while time.time() - t0 < timeout_per_wp:
+
+            t = get_telemetry(ser)
+
+            if t is None:
+                time.sleep(poll_s)
+                continue
+
+            # Erro de posição
+            dx = x_goal - t["x"]
+            dy = y_goal - t["y"]
+
+            distance_error = (dx**2 + dy**2)**0.5
+
+            # Erro angular normalizado para [-180, 180]
+            angle_error = (
+                (th_goal - t["th_deg"] + 180) % 360
+            ) - 180
+
+            if verbose:
+                print(
+                    f"  dist={distance_error:.3f} m | "
+                    f"ang={angle_error:.2f}° | "
+                    f"state={STATE_NAMES.get(t['state'], '?')}"
+                )
+
+            # 3. Confirma chegada
+            if (distance_error <= position_tol and
+                abs(angle_error) <= angle_tol and
+                t["state"] == 2):
+
+                arrived = True
+                break
+
+            time.sleep(poll_s)
+
+        if not arrived:
+            return False, (
+                f"Timeout no waypoint {idx}: "
+                f"posição não confirmada"
+            )
+
+        if verbose:
+            print(f"  Waypoint {idx} alcançado!")
+
+    return True, "Trajetória completamente executada"
+
+
 def run_mission(ser, pts, poll_s=0.5, timeout_s=120.0):
     print(f"[1/3] Enviando {len(pts)} waypoints via <W>...")
-    resp = set_waypoints(ser, pts)
-    print(f"      resposta: {resp}")
-    if resp is None or not resp.startswith("<OK"):
-        return False, "falha ao enviar waypoints"
+
+
+    # pts = [
+    #     (0.1, 0, 0),
+    #     (0.1, 0.1, 0),
+    #     (0.2, 0, 0),
+    #     (0.2, -0.1, 0),
+    #     (0, 0, 0)
+    # ]
+
+    print(f'Parando')
+    stop(ser)
+
+    # resp = goto(ser, pts[0], pts[1], 0)
+    print(f'Iniciando pontos: {pts}')
+
+
+    for pt in pts:
+        print(f"Pontos individuais: {pt}")   
+        resp = add_waypoint(ser, *pt)
+        print(f"      resposta: {resp}")
+        if resp is None or not resp.startswith("<OK"):
+            return False, "falha ao enviar waypoints"
 
     print("[2/3] Disparando <R> (liga + auto-eq 2s + navega)...")
     ok, resp, msg = start(ser, wait_auto_eq=True)
