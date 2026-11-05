@@ -8,7 +8,7 @@ from aux_class import Objeto
 # ----------------------------------------------------------------------
 MIN_AREA = 1000
 EPSILON_FACTOR = 0.002
-LIMITE_PRETO = 55
+LIMITE_PRETO = 70
 RAIO_IGNORAR = 80
 
 
