@@ -28,7 +28,7 @@ IMAGEM_PROCESSAMENTO = "novo/image2.png"
 LADO_QUADRADO_M = 2.35 / 100
 ORIGEM_PIXELS = (600, 400)
 INICIO_M = (-30.0 / 100, 23.0 / 100)
-OBJETIVO_M = (0.7,0) #(-55.0 / 100, 0.0 / 100)
+OBJETIVO_M = (-0.7,-0.1) #(-55.0 / 100, 0.0 / 100)
 RAIO_ROBO_M = 12.5 / 100
 
 # Variáveis de configuração da comunicação com o robô
@@ -38,7 +38,7 @@ BAUD_RATE = 57600
 
 global FLAG
 
-def simplificar_caminho(caminho_px, max_pontos=20):
+def simplificar_caminho(caminho_px, max_pontos=25):
     """
     Simplifica o caminho mantendo as quinas principais e limitando
     o número de pontos ao máximo especificado (ex: 12).
@@ -227,7 +227,7 @@ def processar_frame(frame_bruto, calibracao):
         caminho_m = np.empty((0, 2))
         waypoints_formatados = []
     else:
-        caminho_px = simplificar_caminho(np.array(caminho_px), max_pontos=12)
+        caminho_px = simplificar_caminho(np.array(caminho_px), max_pontos=25)
         
         caminho_m = np.array(
             [calibracao.pixel_para_m(x, y, ORIGEM_PIXELS) for x, y in caminho_px],
@@ -278,7 +278,7 @@ def processar_frame(frame_bruto, calibracao):
         2,
     )
     # print(f"Centro destino: ({x_m:.1f}, {y_m:.1f}) m")
-
+    print(waypoints_formatados)
     tecla = cv2.waitKey(1) & 0xFF
     if tecla in (ord("s"), ord("S")):
         enviar_missao_robo(waypoints_formatados, ENVIAR_PARA_ROBO, PORTA_SERIAL, BAUD_RATE, (x_red_m, y_red_m))
