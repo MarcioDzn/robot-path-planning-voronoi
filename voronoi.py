@@ -8,6 +8,7 @@ import heapq
 # Configurações
 # ----------------------------------------------------------------------
 PASSO_AMOSTRA = 10        # distância (px) entre sites ao longo do contorno
+FATOR_ARCO = 2.0
 
 
 def construir_obstaculos_dilatados(mascara_obstaculos, mascara_arena, raio_px):
@@ -97,13 +98,13 @@ def build_voronoi_roadmap(obstaculos, limites, proibido):
         np.full(len(pts), i) for i, pts in enumerate(amostras)
     ])
 
-    # pos, perimetros = [], []
-    # for pts in amostras:
-    #     seg = np.linalg.norm(np.diff(pts, axis=0, append=pts[:1]), axis=1)
-    #     pos.append(np.concatenate([[0.0], np.cumsum(seg)[:-1]]))
-    #     perimetros.append(seg.sum())
-    # pos = np.concatenate(pos)
-    # perimetros = np.array(perimetros)
+    pos, perimetros = [], []
+    for pts in amostras:
+        seg = np.linalg.norm(np.diff(pts, axis=0, append=pts[:1]), axis=1)
+        pos.append(np.concatenate([[0.0], np.cumsum(seg)[:-1]]))
+        perimetros.append(seg.sum())
+    pos = np.concatenate(pos)
+    perimetros = np.array(perimetros)
 
     xmin, ymin, xmax, ymax = limites
     espelhado = []
@@ -124,13 +125,13 @@ def build_voronoi_roadmap(obstaculos, limites, proibido):
         if todos_ids[s1] < 0 or todos_ids[s2] < 0:
             continue
         if todos_ids[s1] == todos_ids[s2]:
-            continue
-            # i = todos_ids[s1]
-            # d_arco = abs(pos[s1] - pos[s2])
-            # d_arco = min(d_arco, perimetros[i] - d_arco)   # contorno é fechado
-            # d_euc = np.linalg.norm(pontos[s1] - pontos[s2])
-            # if d_arco < FATOR_ARCO * d_euc:
-            #     continue
+            # continue
+            i = todos_ids[s1]
+            d_arco = abs(pos[s1] - pos[s2])
+            d_arco = min(d_arco, perimetros[i] - d_arco)   # contorno é fechado
+            d_euc = np.linalg.norm(pontos[s1] - pontos[s2])
+            if d_arco < FATOR_ARCO * d_euc:
+                continue
 
         a, b = vor.vertices[p1], vor.vertices[p2]
 

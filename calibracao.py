@@ -3,6 +3,8 @@ from dataclasses import dataclass
 import cv2
 import numpy as np
 
+AJUSTE_ANGULO_GRAUS = 83
+
 # ----------------------------------------------------------------------
 # Pré Processamento
 # ----------------------------------------------------------------------
@@ -27,19 +29,22 @@ class Calibracao:
         eixo_x = np.array([np.cos(self.angulo_rad), np.sin(self.angulo_rad)])
         eixo_y = np.array([-np.sin(self.angulo_rad), np.cos(self.angulo_rad)])
 
-        # Inverte a direção dos eixos para que o sentido positivo fique
-        # para a direita no X e para cima no Y.
+        # Mantém +X em -eixo_x e inverte Y para que +Y siga eixo_y.
         return (
             float(-np.dot(ponto, eixo_x) / self.pixels_por_m),
-            float(-np.dot(ponto, eixo_y) / self.pixels_por_m),
+            float(np.dot(ponto, eixo_y) / self.pixels_por_m),
         )
 
     def m_para_pixel(self, x_m, y_m, origem_pixels):
         origem = np.asarray(origem_pixels, dtype=float)
         eixo_x = np.array([np.cos(self.angulo_rad), np.sin(self.angulo_rad)])
         eixo_y = np.array([-np.sin(self.angulo_rad), np.cos(self.angulo_rad)])
-        ponto = origem - self.pixels_por_m * (x_m * eixo_x + y_m * eixo_y)
+        ponto = origem - self.pixels_por_m * x_m * eixo_x
+        ponto += self.pixels_por_m * y_m * eixo_y
         return float(ponto[0]), float(ponto[1])
+
+    def m_para_pixels_inteiro(self, distancia_m):
+        return int(round(distancia_m * self.pixels_por_m))
 
 
 def _maior_agrupamento(pontos, distancia_maxima):
@@ -115,6 +120,9 @@ def calibrar_xadrez(imagem, lado_quadrado_m):
         eixo_x = -eixo_x
     angulo_rad = float(np.arctan2(eixo_x[1], eixo_x[0]))
 
+    # ajuste manual do angulo
+    angulo_rad += np.deg2rad(AJUSTE_ANGULO_GRAUS)
+
     escala = lado_px_estimado / lado_quadrado_m
     return Calibracao(
         pixels_por_m=escala,
@@ -135,12 +143,12 @@ def desenhar_referencial(frame, calibracao, origem_pixels):
 
     for eixo, cor, rotulo in (
         (-eixo_x, (255, 255, 0), "+X"),
-        (-eixo_y, (255, 0, 255), "+Y"),
+        (eixo_y, (255, 0, 255), "+Y"),
     ):
         inicio = tuple(np.round(origem - comprimento * eixo).astype(int))
         fim = tuple(np.round(origem + comprimento * eixo).astype(int))
         cv2.line(frame, inicio, fim, cor, 1)
-        ponta = tuple(np.round(origem + comprimento * 0.4 * eixo).astype(int))
+        ponta = tuple(np.round(origem + comprimento * 0.2 * eixo).astype(int))
         cv2.arrowedLine(frame, ponto_origem, ponta, cor, 2, tipLength=0.03)
         cv2.putText(
             frame, rotulo, (ponta[0] + 8, ponta[1] - 8),
