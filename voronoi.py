@@ -4,9 +4,7 @@ from matplotlib.path import Path
 from scipy.spatial import Voronoi
 import heapq
 
-# ----------------------------------------------------------------------
-# Configurações
-# ----------------------------------------------------------------------
+
 PASSO_AMOSTRA = 10        # distância (px) entre sites ao longo do contorno
 FATOR_ARCO = 2.0
 
@@ -17,13 +15,13 @@ def construir_obstaculos_dilatados(mascara_obstaculos, mascara_arena, raio_px):
         cv2.MORPH_ELLIPSE, (2*raio + 1, 2*raio + 1)
     )
 
-    # Obstáculos internos crescem
+    # obstáculos internos crescem
     obst = cv2.dilate(mascara_obstaculos, k)
 
-    # Arena encolhe (o robô não encosta na parede)
+    # arena encolhe 
     arena_livre = cv2.erode(mascara_arena, k)
 
-    # Proibido = obstáculo dilatado OU fora da arena encolhida
+    # obstáculo dilatado ou fora da arena encolhida
     proibido = cv2.bitwise_or(obst, cv2.bitwise_not(arena_livre))
     return proibido
 
@@ -71,7 +69,7 @@ def inside_bounds(p, limites):
 
 
 def amostrar_poligono(poly, passo=PASSO_AMOSTRA):
-    # Gera pontos ao longo de TODAS as arestas do polígono (não só os vértices),
+    # gera pontos ao longo de TODAS as arestas do polígono (não só os vértices),
     # para o Voronoi aproximar bem a distância às arestas retas.
     pts = []
 
@@ -125,7 +123,6 @@ def build_voronoi_roadmap(obstaculos, limites, proibido):
         if todos_ids[s1] < 0 or todos_ids[s2] < 0:
             continue
         if todos_ids[s1] == todos_ids[s2]:
-            # continue
             i = todos_ids[s1]
             d_arco = abs(pos[s1] - pos[s2])
             d_arco = min(d_arco, perimetros[i] - d_arco)   # contorno é fechado
@@ -138,7 +135,6 @@ def build_voronoi_roadmap(obstaculos, limites, proibido):
         if not inside_bounds(a, limites) or not inside_bounds(b, limites):
             continue
 
-        # Substitui os 4 testes antigos por um só
         if not segmento_livre(a, b, proibido):
             continue
 
@@ -147,8 +143,6 @@ def build_voronoi_roadmap(obstaculos, limites, proibido):
     return bordas
 
 def conectar_ao_roadmap(ponto, bordas, proibido, k=8):
-    """Cria arestas do ponto até os k vértices do roadmap mais próximos
-    que sejam alcançáveis em linha reta sem tocar região proibida."""
     if not bordas:
         return []
 
@@ -169,7 +163,7 @@ def conectar_ao_roadmap(ponto, bordas, proibido, k=8):
 def dijkstra_on_edges(edges, start, goal):
     graph = {}
 
-    # Construir o grafo
+    # constroi o grafo
     for a, b in edges:
         a, b = tuple(a), tuple(b)
         dist = np.linalg.norm(np.array(a) - np.array(b))
@@ -183,13 +177,13 @@ def dijkstra_on_edges(edges, start, goal):
     start = tuple(start)
     goal = tuple(goal)
 
-    # Encontrar os nós mais próximos do início e do objetivo
+    # encontra os nós mais próximos do início e do objetivo
     nos = list(graph.keys())
 
     no_start = min(nos, key=lambda p: np.linalg.norm(np.array(p) - start))
     no_goal = min(nos, key=lambda p: np.linalg.norm(np.array(p) - goal))
 
-    # Conectar início e objetivo ao grafo
+    # conecta início e objetivo ao grafo
     graph.setdefault(start, []).append(
         (no_start, np.linalg.norm(np.array(start) - no_start))
     )
@@ -204,7 +198,6 @@ def dijkstra_on_edges(edges, start, goal):
         (goal, np.linalg.norm(np.array(goal) - no_goal))
     )
 
-    # Dijkstra
     fila = [(0, start, [start])]
     visitados = set()
 

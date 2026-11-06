@@ -3,25 +3,18 @@ import numpy as np
 from aux_class import Objeto
 
 
-# ----------------------------------------------------------------------
-# Configurações
-# ----------------------------------------------------------------------
 MIN_AREA = 1000
 EPSILON_FACTOR = 0.002
 LIMITE_PRETO = 70
 RAIO_IGNORAR = 80
 
 
-# ----------------------------------------------------------------------
-# Detecção e classificação de formas
-# ----------------------------------------------------------------------
 def classificarForma(cnt, approx):
     vertices = len(approx)
 
     area = cv2.contourArea(cnt)
     peri = cv2.arcLength(cnt, True)
 
-    # Circularidade
     circ = (4 * np.pi * area) / (peri ** 2) if peri > 0 else 0
 
     if vertices >= 8 and circ > 0.85:
@@ -31,7 +24,6 @@ def classificarForma(cnt, approx):
         return "Triangulo", (255, 0, 0)
 
     elif vertices == 4:
-        # minAreaRect é invariante à rotação (boundingRect não é)
         (_, _), (w, h), _ = cv2.minAreaRect(approx)
         prop = w / h if h > 0 else 0
 
@@ -123,9 +115,7 @@ def detectarFormas(frame, mascara_exclusao=None, ponto_central=None, raio_metros
     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
     blur = cv2.GaussianBlur(gray, (5, 5), 0)
 
-    # --------------------------------------------------
-    # 1. Identifica a região branca da arena
-    # --------------------------------------------------
+    # identifica a regiao branca da arena
     _, mascara_arena = cv2.threshold(
         blur, LIMITE_PRETO, 255, cv2.THRESH_BINARY
     )
@@ -136,7 +126,7 @@ def detectarFormas(frame, mascara_exclusao=None, ponto_central=None, raio_metros
         mascara_arena, cv2.MORPH_CLOSE, kernel
     )
 
-    # Encontra as regiões brancas
+    # encontra as regiões brancas
     contornos_arena, _ = cv2.findContours(
         mascara_arena,
         cv2.RETR_EXTERNAL,
@@ -146,7 +136,7 @@ def detectarFormas(frame, mascara_exclusao=None, ponto_central=None, raio_metros
     if not contornos_arena:
         return [], np.zeros_like(gray), np.zeros_like(gray)
 
-    # A maior região branca é considerada a arena
+    # a maior região branca é considerada a arena
     contorno_arena = max(
         contornos_arena, key=cv2.contourArea
     )
@@ -162,9 +152,7 @@ def detectarFormas(frame, mascara_exclusao=None, ponto_central=None, raio_metros
     )
 
     
-    # --------------------------------------------------
-    # 2. Detecta obstáculos pretos dentro da arena
-    # --------------------------------------------------
+    # detecta objetos pretos
     _, mascara_pretos = cv2.threshold(
         blur, LIMITE_PRETO, 255, cv2.THRESH_BINARY_INV
     )
@@ -173,7 +161,7 @@ def detectarFormas(frame, mascara_exclusao=None, ponto_central=None, raio_metros
         mascara_pretos, mascara_arena
     )
 
-    # Remove ruídos pequenos
+    # remove ruídos pequenos
     kernel_ruido = np.ones((3, 3), np.uint8)
 
     mascara_obstaculos = cv2.morphologyEx(
@@ -196,9 +184,7 @@ def detectarFormas(frame, mascara_exclusao=None, ponto_central=None, raio_metros
         mascara_obstaculos, cv2.bitwise_not(circulo)
     )
 
-    # --------------------------------------------------
-    # 3. Extrai e classifica os obstáculos
-    # --------------------------------------------------
+    # extrai e classifica obstaculos
     contours, _ = cv2.findContours(
         mascara_obstaculos,
         cv2.RETR_LIST,

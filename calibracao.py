@@ -5,9 +5,6 @@ import numpy as np
 
 AJUSTE_ANGULO_GRAUS = 83
 
-# ----------------------------------------------------------------------
-# Pré Processamento
-# ----------------------------------------------------------------------
 def adicionar_borda_preta(imagem):
     return cv2.copyMakeBorder(
         imagem,
@@ -29,7 +26,6 @@ class Calibracao:
         eixo_x = np.array([np.cos(self.angulo_rad), np.sin(self.angulo_rad)])
         eixo_y = np.array([-np.sin(self.angulo_rad), np.cos(self.angulo_rad)])
 
-        # Mantém +X em -eixo_x e inverte Y para que +Y siga eixo_y.
         return (
             float(-np.dot(ponto, eixo_x) / self.pixels_por_m),
             float(np.dot(ponto, eixo_y) / self.pixels_por_m),

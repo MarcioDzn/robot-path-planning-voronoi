@@ -18,9 +18,6 @@ from voronoi import (
     extrair_contornos_sites,
 )
 
-# ----------------------------------------------------------------------
-# Configurações
-# ----------------------------------------------------------------------
 CAM_INDEX = 0
 
 IMAGEM_CALIBRACAO = "novo/xadrez4.png"
@@ -31,34 +28,26 @@ INICIO_M = (-30.0 / 100, 23.0 / 100)
 OBJETIVO_M = (-0.7,-0.1) #(-55.0 / 100, 0.0 / 100)
 RAIO_ROBO_M = 12.5 / 100
 
-# Variáveis de configuração da comunicação com o robô
+# variáveis de configuração da comunicação com o robô
 ENVIAR_PARA_ROBO = True
 PORTA_SERIAL = "/dev/ttyUSB0"
 BAUD_RATE = 57600
 
-global FLAG
 
 def simplificar_caminho(caminho_px, max_pontos=25):
-    """
-    Simplifica o caminho mantendo as quinas principais e limitando
-    o número de pontos ao máximo especificado (ex: 12).
-    """
+
     if len(caminho_px) <= max_pontos:
         return caminho_px
 
-    # Converte o array para o formato aceito pelo cv2.approxPolyDP
     pts = caminho_px.astype(np.float32).reshape(-1, 1, 2)
     
-    # Começa com uma tolerância (epsilon) inicial e vai ajustando 
-    # iterativamente até o número de pontos ficar menor ou igual a max_pontos
     epsilon = 1.0
-    for _ in range(50):  # Limite de segurança para evitar loop infinito
+    for _ in range(50): 
         aprox = cv2.approxPolyDP(pts, epsilon, closed=False)
         if len(aprox) <= max_pontos:
             break
-        epsilon += 1.05  # Aumenta a tolerância para remover mais pontos
+        epsilon += 1.05  
         
-    # Retorna no formato (N, 2)
     return aprox.reshape(-1, 2)
 
 
@@ -73,7 +62,8 @@ def formatar_waypoints(caminho_m):
             th = np.degrees(np.arctan2(dy, dx))
         else:
             th = waypoints_formatados[-1][2] if waypoints_formatados else 0.0
-        #waypoints_formatados.append((float(x), float(y), float(th)))
+
+        # robô não precisa saber da orientação
         waypoints_formatados.append((float(x), float(y), 0))
     
     return waypoints_formatados
@@ -85,14 +75,11 @@ def enviar_missao_robo(waypoints_formatados, enviar, porta, baud, start_point):
         try:
             ser = connect(porta, baud)
             print("[Bluetooth] Conectado!")
-            #pose
 
-            # follow_waypoints(ser, waypoints_formatados)
             set_pose(ser, start_point[0], start_point[1], 0)
 
             print(f"posição inicial: {start_point}")
 
-            # Usa a função em lote do controle_bt.py (<W> + <R> + Telemetria)
             ok, msg = run_mission(ser, waypoints_formatados, poll_s=0.5, timeout_s=120.0)
             print(f"Resultado da missão: {msg}")
 
@@ -131,7 +118,6 @@ def desenharResultados(frame, objetos: list[Objeto], calibracao: Calibracao):
 
 
 def abrir_camera():
-    """Devolve um VideoCapture funcionando ou None se não der."""
     try:
         video = cv2.VideoCapture(CAM_INDEX)
         if not video.isOpened():
@@ -146,7 +132,6 @@ def abrir_camera():
 
 
 def aguardar_calibracao(video):
-    """Mostra o vídeo ao vivo até apertar N (devolve o frame) ou Q (devolve None)."""
     while True:
         ok, frame = video.read()
         if not ok:
@@ -180,13 +165,10 @@ def processar_frame(frame_bruto, calibracao):
 
     centros_vermelhos, mascara_vermelha = detectarMarcadoresVermelhos(frame)
 
-    # ---------- Início e objetivo ----------
     if centros_vermelhos:
         inicio_px = centros_vermelhos[0]
-        # print(f"Início da trajetória definido pelo marcador: {inicio_px} px")
     else:
         inicio_px = calibracao.m_para_pixel(*INICIO_M, ORIGEM_PIXELS)
-        # print(f"Sem marcador; usando INICIO_M como início: {INICIO_M} m")
 
     objetivo_px = calibracao.m_para_pixel(*OBJETIVO_M, ORIGEM_PIXELS)
 
@@ -207,23 +189,20 @@ def processar_frame(frame_bruto, calibracao):
         p2 = tuple(np.round(b).astype(int))
         cv2.line(frame, p1, p2, (0, 255, 0), 2)
 
-    # ---------- Debug visual: região proibida ----------
     contornos_proibido, _ = cv2.findContours(
         proibido, cv2.RETR_CCOMP, cv2.CHAIN_APPROX_SIMPLE
     )
     cv2.drawContours(frame, contornos_proibido, -1, (255, 0, 255), 1)
 
-    # ---------- Liga início/objetivo ao roadmap ----------
     arestas_inicio = conectar_ao_roadmap(inicio_px, bordas, proibido)
     arestas_objetivo = conectar_ao_roadmap(objetivo_px, bordas, proibido)
 
     bordas_busca = bordas + arestas_inicio + arestas_objetivo
 
-    # ---------- Caminho ----------
     caminho_px = dijkstra_on_edges(bordas_busca, inicio_px, objetivo_px)
 
+    # nenhum caminho encontrado
     if caminho_px is None or len(caminho_px) < 2:
-        # print("Nenhum caminho encontrado.")
         caminho_m = np.empty((0, 2))
         waypoints_formatados = []
     else:
@@ -233,7 +212,6 @@ def processar_frame(frame_bruto, calibracao):
             [calibracao.pixel_para_m(x, y, ORIGEM_PIXELS) for x, y in caminho_px],
             dtype=float,
         ).reshape(-1, 2)
-        # print(caminho_m)
 
         waypoints_formatados = formatar_waypoints(caminho_m)
 
@@ -247,7 +225,7 @@ def processar_frame(frame_bruto, calibracao):
                 3,
             )
 
-    # ---------- Marcadores vermelhos ----------
+    # marcacao do centro vermelho
     x_px, y_px = inicio_px
     x_red_m, y_red_m = calibracao.pixel_para_m(x_px, y_px, ORIGEM_PIXELS)
     centro_px = (int(round(x_px)), int(round(y_px)))
@@ -261,9 +239,8 @@ def processar_frame(frame_bruto, calibracao):
         (0, 0, 255),
         2,
     )
-    # print(f"Centro vermelho: ({x_m:.1f}, {y_m:.1f}) m")
 
-    # ----Exibir destino----
+    # destino
     x_px, y_px = objetivo_px
     x_m, y_m = calibracao.pixel_para_m(x_px, y_px, ORIGEM_PIXELS)
     centro_px = (int(round(x_px)), int(round(y_px)))
@@ -277,14 +254,10 @@ def processar_frame(frame_bruto, calibracao):
         (0, 0, 255),
         2,
     )
-    # print(f"Centro destino: ({x_m:.1f}, {y_m:.1f}) m")
     print(waypoints_formatados)
     tecla = cv2.waitKey(1) & 0xFF
     if tecla in (ord("s"), ord("S")):
         enviar_missao_robo(waypoints_formatados, ENVIAR_PARA_ROBO, PORTA_SERIAL, BAUD_RATE, (x_red_m, y_red_m))
-
-        # elif tecla in (ord("r"), ord("R")):
-        #     FLAG = 0
 
     elif tecla in (ord('t'), ord('T')):
         ser = connect(PORTA_SERIAL, BAUD_RATE)
@@ -292,7 +265,6 @@ def processar_frame(frame_bruto, calibracao):
         set_pose(ser, x_red_m, y_red_m, 0)
         print(f"posição inicial: {x_red_m, y_red_m}")
 
-    # ---------- Exibição ----------
     desenhar_referencial(frame, calibracao, ORIGEM_PIXELS)
     frame = desenharResultados(frame, objetos, calibracao)
 
@@ -300,10 +272,9 @@ def processar_frame(frame_bruto, calibracao):
 
 
 def main():
-    FLAG = 0
     video = abrir_camera()
 
-    # ---------------- Sem câmera: imagens estáticas ----------------
+    # caso não tenha camera
     if video is None:
         imagem_calib = cv2.imread(str(IMAGEM_CALIBRACAO), cv2.IMREAD_GRAYSCALE)
         if imagem_calib is None:
@@ -332,7 +303,7 @@ def main():
         cv2.destroyAllWindows()
         return
 
-    # ---------------- Com câmera ----------------
+
     try:
         # frame_calib = aguardar_calibracao(video)
         # if frame_calib is None:
