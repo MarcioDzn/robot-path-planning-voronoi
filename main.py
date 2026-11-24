@@ -157,21 +157,33 @@ def enviar_missao_robo(
     ):
         raise ValueError("Parâmetros do controlador e do loop devem ser valores finitos.")
 
+
     inicio = time.monotonic()
-    ser = connect(PORTA_SERIAL, BAUD_RATE)
+    ser, rx_q, running, t = connect(port, args.baud, args.timeout)
+
     try:
+        # define a pose inicial do robô
+        # TODO: mudar pra a pose que a gente quer
+        set_pose(ser, rx_q, 0.0, 0.0, 0.0)
+
         for waypoint in waypoints_formatados:
             objetivo = waypoint[:2]
+
             while True:
                 if time.monotonic() - inicio >= timeout_s:
                     raise TimeoutError("Tempo limite da missão excedido.")
 
-                pose_atual = get_telemetry()
-                pose_atual = (pose_atual["x"],pose_atual["y"],pose_atual["th_deg"]*math.pi/180)
-                #pose_atual = obter_pose()
-               
-               
-               
+                tm = get_telemetry(ser, rx_q)
+                if tm is None:
+                    time.sleep(periodo_s)
+                    continue
+
+                pose_atual = (
+                    tm["x"],
+                    tm["y"],
+                    math.radians(tm["th_deg"]),
+                )
+
                 v_lin, v_ang, concluido = controle_referencia_variavel_posicao(
                     pose_atual,
                     objetivo,
@@ -181,17 +193,17 @@ def enviar_missao_robo(
                     v_ang_max,
                     tol,
                 )
-                run_mission(ser, v_lin, v_ang)
+
                 if concluido:
+                    send_v(ser, 0.0, 0.0)
                     break
+
+                send_v(ser, v_lin, v_ang)
                 time.sleep(periodo_s)
 
-
     finally:
-        try:
-            run_mission(ser, 0.0, 0.0)
-        finally:
-            ser.close()
+        send_v(ser, 0.0, 0.0)
+        close(ser, running, t)
 
 
 def desenharResultados(frame, objetos: list[Objeto], calibracao: Calibracao):
