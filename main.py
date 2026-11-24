@@ -1,3 +1,7 @@
+import math
+import time
+from typing import Callable, Optional, Tuple
+
 import cv2
 import numpy as np
 
@@ -28,11 +32,16 @@ INICIO_M = (-30.0 / 100, 23.0 / 100)
 OBJETIVO_M = (-0.7,-0.1) #(-55.0 / 100, 0.0 / 100)
 RAIO_ROBO_M = 12.5 / 100
 
-# variáveis de configuração da comunicação com o robô
 ENVIAR_PARA_ROBO = True
 PORTA_SERIAL = "/dev/ttyUSB0"
 BAUD_RATE = 57600
-
+K_L = 0.75
+K_THETA = 1.75
+V_LIN_MAX = 0.722
+V_ANG_MAX = 8.5
+TOL_POSICAO_M = 0.02
+PERIODO_CONTROLE_S = 0.05
+TIMEOUT_MISSAO_S = 120.0
 
 def simplificar_caminho(caminho_px, max_pontos=25):
 
@@ -69,26 +78,113 @@ def formatar_waypoints(caminho_m):
     return waypoints_formatados
 
 
-def enviar_missao_robo(waypoints_formatados, enviar, porta, baud, start_point):
-    if enviar:
-        print(f"\n[Bluetooth] Tentando conectar em {porta}...")
-        try:
-            ser = connect(porta, baud)
-            print("[Bluetooth] Conectado!")
+def controle_referencia_variavel_posicao(
+    pose_atual,
+    objetivo,
+    k_l,
+    k_theta,
+    v_lin_max,
+    v_ang_max,
+    tol,
+):
+    """Calcula (velocidade linear, omega) para a pose atual e o alvo."""
+    x, y, theta = pose_atual
+    x_d, y_d = objetivo
+    valores = (x, y, theta, x_d, y_d, k_l, k_theta, v_lin_max, v_ang_max, tol)
+    if not all(math.isfinite(valor) for valor in valores):
+        raise ValueError("Pose, objetivo e parâmetros devem ser valores finitos.")
+    if k_l < 0 or k_theta < 0 or v_lin_max <= 0 or v_ang_max <= 0 or tol <= 0:
+        raise ValueError("Ganhos não podem ser negativos; limites e tolerância devem ser positivos.")
 
-            set_pose(ser, start_point[0], start_point[1], 0)
+    delta_x = x_d - x
+    delta_y = y_d - y
+    delta_l = math.hypot(delta_x, delta_y)
 
-            print(f"posição inicial: {start_point}")
+    if delta_l < tol:
+        return 0.0, 0.0, True
 
-            ok, msg = run_mission(ser, waypoints_formatados, poll_s=0.5, timeout_s=120.0)
-            print(f"Resultado da missão: {msg}")
+    theta_d = math.atan2(delta_y, delta_x)
+    delta_theta = math.atan2(
+        math.sin(theta_d - theta),
+        math.cos(theta_d - theta),
+    )
+    delta_l_proj = delta_l * math.cos(delta_theta)
+    v_lin = k_l * delta_l_proj
+    v_ang = k_theta * delta_theta
 
-            ser.close()
-            print("[Bluetooth] Porta fechada.")
-        except Exception as e:
-            print(f"Erro na comunicação serial com o robô: {e}")
-    else:
+    v_lin = max(-v_lin_max, min(v_lin, v_lin_max))
+    v_ang = max(-v_ang_max, min(v_ang, v_ang_max))
+    return v_lin, v_ang, False
+
+
+def enviar_missao_robo(
+    waypoints_formatados,
+    enviar,
+    obter_pose,
+    k_l=K_L,
+    k_theta=K_THETA,
+    v_lin_max=V_LIN_MAX,
+    v_ang_max=V_ANG_MAX,
+    tol=TOL_POSICAO_M,
+    periodo_s=PERIODO_CONTROLE_S,
+    timeout_s=TIMEOUT_MISSAO_S,
+):
+    """Lê a pose e chama run_mission com velocidade linear e angular."""
+    if not enviar:
         print("\n[Modo Simulação] Envio para o robô desativado (ENVIAR_PARA_ROBO = False).")
+        return
+
+    if not waypoints_formatados:
+        print("Missão não enviada: nenhum waypoint válido.")
+        return
+    if obter_pose is None:
+        raise RuntimeError(
+            "Configure OBTER_POSE_ROBO antes de enviar a missão."
+        )
+    if (
+        k_l < 0
+        or k_theta < 0
+        or v_lin_max <= 0
+        or v_ang_max <= 0
+        or tol <= 0
+        or periodo_s <= 0
+        or timeout_s <= 0
+    ):
+        raise ValueError("Ganhos não podem ser negativos; limites, tolerância e tempos devem ser positivos.")
+    if not all(
+        math.isfinite(valor)
+        for valor in (k_l, k_theta, v_lin_max, v_ang_max, tol, periodo_s, timeout_s)
+    ):
+        raise ValueError("Parâmetros do controlador e do loop devem ser valores finitos.")
+
+    inicio = time.monotonic()
+    ser = connect(PORTA_SERIAL, BAUD_RATE)
+    try:
+        for waypoint in waypoints_formatados:
+            objetivo = waypoint[:2]
+            while True:
+                if time.monotonic() - inicio >= timeout_s:
+                    raise TimeoutError("Tempo limite da missão excedido.")
+
+                pose_atual = obter_pose()
+                v_lin, omega, concluido = controle_referencia_variavel_posicao(
+                    pose_atual,
+                    objetivo,
+                    k_l,
+                    k_theta,
+                    v_lin_max,
+                    v_ang_max,
+                    tol,
+                )
+                run_mission(ser, v_lin, omega)
+                if concluido:
+                    break
+                time.sleep(periodo_s)
+    finally:
+        try:
+            run_mission(ser, 0.0, 0.0)
+        finally:
+            ser.close()
 
 
 def desenharResultados(frame, objetos: list[Objeto], calibracao: Calibracao):
@@ -257,7 +353,11 @@ def processar_frame(frame_bruto, calibracao):
     print(waypoints_formatados)
     tecla = cv2.waitKey(1) & 0xFF
     if tecla in (ord("s"), ord("S")):
-        enviar_missao_robo(waypoints_formatados, ENVIAR_PARA_ROBO, PORTA_SERIAL, BAUD_RATE, (x_red_m, y_red_m))
+        enviar_missao_robo(
+            waypoints_formatados,
+            ENVIAR_PARA_ROBO,
+            lambda: (x_red_m, y_red_m, 0.0),
+        )
 
     elif tecla in (ord('t'), ord('T')):
         ser = connect(PORTA_SERIAL, BAUD_RATE)
