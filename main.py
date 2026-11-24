@@ -12,7 +12,7 @@ from calibracao import (
     calibrar_xadrez,
     desenhar_referencial,
 )
-from controle_bt import connect, run_mission, set_pose, follow_waypoints
+from controle_bt import connect, run_mission, set_pose, follow_waypoints, get_telemetry
 from proc_img import detectarFormas, detectarMarcadoresVermelhos
 from voronoi import (
     build_voronoi_roadmap,
@@ -166,8 +166,13 @@ def enviar_missao_robo(
                 if time.monotonic() - inicio >= timeout_s:
                     raise TimeoutError("Tempo limite da missão excedido.")
 
-                pose_atual = obter_pose()
-                v_lin, omega, concluido = controle_referencia_variavel_posicao(
+                pose_atual = get_telemetry()
+                pose_atual = (pose_atual["x"],pose_atual["y"],pose_atual["th_deg"]*math.pi/180)
+                #pose_atual = obter_pose()
+               
+               
+               
+                v_lin, v_ang, concluido = controle_referencia_variavel_posicao(
                     pose_atual,
                     objetivo,
                     k_l,
@@ -176,10 +181,12 @@ def enviar_missao_robo(
                     v_ang_max,
                     tol,
                 )
-                run_mission(ser, v_lin, omega)
+                run_mission(ser, v_lin, v_ang)
                 if concluido:
                     break
                 time.sleep(periodo_s)
+
+
     finally:
         try:
             run_mission(ser, 0.0, 0.0)
