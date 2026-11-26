@@ -159,7 +159,7 @@ def enviar_missao_robo(
 
 
     inicio = time.monotonic()
-    ser, rx_q, running, t = connect(port, args.baud, args.timeout)
+    ser, rx_q, running, t = connect(PORTA_SERIAL, BAUD_RATE)
 
     try:
         # define a pose inicial do robô
