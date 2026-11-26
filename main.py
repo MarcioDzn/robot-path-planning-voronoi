@@ -12,7 +12,7 @@ from calibracao import (
     calibrar_xadrez,
     desenhar_referencial,
 )
-from RF_High_Level_Position_Control_TEC220 import connect, set_pose, get_telemetry, send_v, close
+from RF_High_Level_Position_Control_TEC220 import connect, set_pose, run_mission, stop, get_telemetry, send_v, close
 from proc_img import detectarFormas, detectarMarcadoresVermelhos
 from voronoi import (
     build_voronoi_roadmap,
@@ -40,7 +40,7 @@ K_THETA = 1.75
 V_LIN_MAX = 0.722
 V_ANG_MAX = 8.5
 TOL_POSICAO_M = 0.02
-PERIODO_CONTROLE_S = 0.05
+PERIODO_CONTROLE_S = 0.005
 TIMEOUT_MISSAO_S = 120.0
 
 def simplificar_caminho(caminho_px, max_pontos=25):
@@ -134,13 +134,13 @@ def enviar_missao_robo(
         print("\n[Modo Simulação] Envio para o robô desativado (ENVIAR_PARA_ROBO = False).")
         return
 
-    if not waypoints_formatados:
-        print("Missão não enviada: nenhum waypoint válido.")
-        return
-    if pose is None:
-        raise RuntimeError(
-            "Configure OBTER_POSE_ROBO antes de enviar a missão."
-        )
+    # if not waypoints_formatados:
+    #     print("Missão não enviada: nenhum waypoint válido.")
+    #     return
+    # if pose is None:
+    #     raise RuntimeError(
+    #         "Configure OBTER_POSE_ROBO antes de enviar a missão."
+    #     )
     if (
         k_l < 0
         or k_theta < 0
@@ -161,13 +161,24 @@ def enviar_missao_robo(
     inicio = time.monotonic()
     ser, rx_q, running, t = connect(PORTA_SERIAL, BAUD_RATE)
 
+    waypoints_formatados = [(0.1, 0, 0),(0.2, 0.1, 0)]
+
+    # run_mission(ser, rx_q, waypoints_formatados)
+    
     try:
+        print("FOI")
         # define a pose inicial do robô
         # TODO: mudar pra a pose que a gente quer
-        set_pose(ser, rx_q, pose[0], pose[1], pose[2])
-
+        set_pose(ser, rx_q, 0, 0, 0)
+        send_v(ser, 0.0, 0.0)
+        stop(ser, rx_q)
+        
+    
         for waypoint in waypoints_formatados:
+            # waypoint = (0.1, 0.1, 0)
             objetivo = waypoint[:2]
+
+    
 
             while True:
                 if time.monotonic() - inicio >= timeout_s:
@@ -369,7 +380,7 @@ def processar_frame(frame_bruto, calibracao):
         (0, 0, 255),
         2,
     )
-    print(waypoints_formatados)
+    # print(waypoints_formatados)
     tecla = cv2.waitKey(1) & 0xFF
     if tecla in (ord("s"), ord("S")):
         enviar_missao_robo(

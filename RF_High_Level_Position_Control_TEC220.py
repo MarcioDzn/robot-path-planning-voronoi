@@ -39,7 +39,7 @@ import serial.tools.list_ports
 
 
 # ---- Defaults (adapte ao seu adaptador RF) ------------------------------
-DEFAULT_PORT = os.environ.get("RF_PORT", "COM14")
+DEFAULT_PORT = "/dev/ttyUSB0"
 DEFAULT_BAUD = int(os.environ.get("RF_BAUD", "57600"))
 DEFAULT_TMO  = float(os.environ.get("RF_TIMEOUT", "2.0"))
 # -------------------------------------------------------------------------
@@ -243,8 +243,8 @@ def get_telemetry(ser, rx_q, timeout=DEFAULT_TMO):
             "x":      float(x),
             "y":      float(y),
             "th_deg": float(th),
-            "v":      float(v),
-            "w":      float(w),
+            # "v":      float(v),
+            # "w":      float(w),
             "w_deg":  float(w) * 180.0 / math.pi,
             "t_ms":   int(t),
             "wp":     -1,
