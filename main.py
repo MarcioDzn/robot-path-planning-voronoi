@@ -12,7 +12,7 @@ from calibracao import (
     calibrar_xadrez,
     desenhar_referencial,
 )
-from controle_bt import connect, run_mission, set_pose, follow_waypoints, get_telemetry
+from RF_High_Level_Position_Control_TEC220 import connect, run_mission, set_pose, follow_waypoints, get_telemetry, send_v, close
 from proc_img import detectarFormas, detectarMarcadoresVermelhos
 from voronoi import (
     build_voronoi_roadmap,
