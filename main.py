@@ -120,7 +120,7 @@ def controle_referencia_variavel_posicao(
 def enviar_missao_robo(
     waypoints_formatados,
     enviar,
-    obter_pose,
+    pose,
     k_l=K_L,
     k_theta=K_THETA,
     v_lin_max=V_LIN_MAX,
@@ -137,7 +137,7 @@ def enviar_missao_robo(
     if not waypoints_formatados:
         print("Missão não enviada: nenhum waypoint válido.")
         return
-    if obter_pose is None:
+    if pose is None:
         raise RuntimeError(
             "Configure OBTER_POSE_ROBO antes de enviar a missão."
         )
@@ -164,7 +164,7 @@ def enviar_missao_robo(
     try:
         # define a pose inicial do robô
         # TODO: mudar pra a pose que a gente quer
-        set_pose(ser, rx_q, 0.0, 0.0, 0.0)
+        set_pose(ser, rx_q, pose[0], pose[1], pose[2])
 
         for waypoint in waypoints_formatados:
             objetivo = waypoint[:2]
@@ -375,7 +375,7 @@ def processar_frame(frame_bruto, calibracao):
         enviar_missao_robo(
             waypoints_formatados,
             ENVIAR_PARA_ROBO,
-            lambda: (x_red_m, y_red_m, 0.0),
+            pose=(x_red_m, y_red_m, 0.0),
         )
 
     elif tecla in (ord('t'), ord('T')):
